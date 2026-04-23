@@ -1380,6 +1380,7 @@ class Editor:
 
         te.bind("<KeyRelease>", lambda e, r=row: self._on_key(r))
         te.bind("<Return>",     lambda e, r=row: self._next(r))
+        te.bind("<BackSpace>",  lambda e, r=row: self._backspace(r))
         te.bind("<Down>",       lambda e, r=row: self._go(r + 1))
         te.bind("<Up>",         lambda e, r=row: self._go(r - 1))
         te.bind("<Tab>",        lambda e, r=row: self._go(r + 1))
@@ -1419,6 +1420,49 @@ class Editor:
         if 0 <= row < len(self.lines):
             self.lines[row][0].focus_set()
         return "break"
+
+    def _delete_row(self, row):
+        """Remove a row and re-grid everything below it."""
+        if row >= len(self.lines):
+            return
+        te, me = self.lines.pop(row)
+        te.destroy()
+        me.destroy()
+        if row < len(self._rhyme_cells):
+            self._rhyme_cells.pop(row).destroy()
+        if row < len(self._meter_rows):
+            self._meter_rows.pop(row).destroy()
+        if row < len(self._line_meta):
+            self._line_meta.pop(row)
+        # Re-grid remaining rows so their grid row numbers stay correct
+        for i in range(row, len(self.lines)):
+            te2, me2 = self.lines[i]
+            te2.grid(row=i, column=0, sticky="ew")
+            me2.grid(row=i, column=1, sticky="ew")
+            if i < len(self._rhyme_cells):
+                self._rhyme_cells[i].grid(row=i, column=2, sticky="ew")
+            if i < len(self._meter_rows):
+                self._meter_rows[i].grid(row=i, column=0, sticky="ew")
+        if self._last_focus_row is not None and self._last_focus_row >= len(self.lines):
+            self._last_focus_row = None
+            self._last_focus_cursor = 0
+
+    def _backspace(self, row):
+        te = self.lines[row][0]
+        text = te.get()
+        cursor = te.index(tk.INSERT)
+        if text == "" and cursor == 0 and row > 0:
+            self._mark_dirty()
+            self._delete_row(row)
+            prev_row = row - 1
+            self.lines[prev_row][0].focus_set()
+            # Place cursor at end of the previous line
+            prev_len = len(self.lines[prev_row][0].get())
+            self.lines[prev_row][0].icursor(prev_len)
+            self._update_rhyme_scheme()
+            return "break"
+        # Let the default BackSpace behavior happen
+        return None
 
     def _trim_rows(self, target):
         """Destroy excess rows and their associated widgets to prevent leaks."""
