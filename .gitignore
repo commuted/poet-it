@@ -8,3 +8,6 @@ build/
 .eggs/
 *.log
 out.txt
+AGENTS.md
+CLAUDE.md
+
