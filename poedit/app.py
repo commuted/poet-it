@@ -1349,6 +1349,22 @@ class Editor:
     # Row management
     # ------------------------------------------------------------------ #
 
+    def _row_of(self, widget):
+        """Return the current row index for a text entry widget."""
+        for i, (te, _) in enumerate(self.lines):
+            if te is widget:
+                return i
+        return None
+
+    def _bind_row(self, widget, event, handler, offset=0):
+        """Bind an event to a handler that receives the widget's current row."""
+        def wrapper(e):
+            row = self._row_of(e.widget)
+            if row is None:
+                return "break"
+            return handler(row + offset)
+        widget.bind(event, wrapper)
+
     def _add_row(self, text=""):
         row  = len(self.lines)
         spec = self._font_spec()
@@ -1378,15 +1394,15 @@ class Editor:
         me.grid(row=row, column=1, sticky="ew")
         rc.grid(row=row, column=2, sticky="ew")
 
-        te.bind("<KeyRelease>", lambda e, r=row: self._on_key(r))
-        te.bind("<Return>",     lambda e, r=row: self._next(r))
-        te.bind("<BackSpace>",  lambda e, r=row: self._backspace(r))
-        te.bind("<Down>",       lambda e, r=row: self._go(r + 1))
-        te.bind("<Up>",         lambda e, r=row: self._go(r - 1))
-        te.bind("<Tab>",        lambda e, r=row: self._go(r + 1))
-        te.bind("<FocusIn>",    lambda e, r=row: self._on_focus_in(r))
-        te.bind("<FocusOut>",   lambda e, r=row: self._on_focus_out(r))
-        te.bind("<<Paste>>",    lambda e, r=row: self._paste(r))
+        self._bind_row(te, "<KeyRelease>", self._on_key)
+        self._bind_row(te, "<Return>",     self._next)
+        self._bind_row(te, "<BackSpace>",  self._backspace)
+        self._bind_row(te, "<Down>",       self._go, offset=1)
+        self._bind_row(te, "<Up>",         self._go, offset=-1)
+        self._bind_row(te, "<Tab>",        self._go, offset=1)
+        self._bind_row(te, "<FocusIn>",    self._on_focus_in)
+        self._bind_row(te, "<FocusOut>",   self._on_focus_out)
+        self._bind_row(te, "<<Paste>>",    self._paste)
 
         self._line_meta.append(
             [{"font": fname, "size": fsize, "len": len(text)}] if text else []
@@ -1435,15 +1451,21 @@ class Editor:
             self._meter_rows.pop(row).destroy()
         if row < len(self._line_meta):
             self._line_meta.pop(row)
-        # Re-grid remaining rows so their grid row numbers stay correct
+        # Re-grid remaining rows so their grid row numbers stay correct,
+        # respecting the current meter mode.
+        meter_on = self._meter_var.get()
         for i in range(row, len(self.lines)):
             te2, me2 = self.lines[i]
-            te2.grid(row=i, column=0, sticky="ew")
+            if meter_on and i < len(self._meter_rows):
+                te2.grid_remove()
+                self._meter_rows[i].grid(row=i, column=0, sticky="ew")
+            else:
+                if i < len(self._meter_rows):
+                    self._meter_rows[i].grid_remove()
+                te2.grid(row=i, column=0, sticky="ew")
             me2.grid(row=i, column=1, sticky="ew")
             if i < len(self._rhyme_cells):
                 self._rhyme_cells[i].grid(row=i, column=2, sticky="ew")
-            if i < len(self._meter_rows):
-                self._meter_rows[i].grid(row=i, column=0, sticky="ew")
         if self._last_focus_row is not None and self._last_focus_row >= len(self.lines):
             self._last_focus_row = None
             self._last_focus_cursor = 0
