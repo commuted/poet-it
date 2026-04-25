@@ -1350,9 +1350,14 @@ class Editor:
     # ------------------------------------------------------------------ #
 
     def _row_of(self, widget):
-        """Return the current row index for a text entry widget."""
+        """Return the current row index for a text entry widget.
+
+        Uses path-name comparison rather than identity, since tkinter
+        event.widget may be a string path in some versions.
+        """
+        target = str(widget)
         for i, (te, _) in enumerate(self.lines):
-            if te is widget:
+            if str(te) == target:
                 return i
         return None
 
