@@ -1,0 +1,16 @@
+Poedit
+
+A poetry editor with meter analysis, rhyme detection, and linguistic tools.
+
+Features:
+  - Line-by-line text editing with syllable counting
+  - Metric stress analysis (prosodic library)
+  - Rhyme scheme detection and lookup
+  - Word definitions and dependency diagrams
+  - Thesaurus integration
+
+Support:
+  Scan the QR code below or visit the project repository for issues,
+  bug reports, and feature requests.
+
+Version 0.1.0
