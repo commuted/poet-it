@@ -1775,43 +1775,6 @@ class Editor:
             tagged = [(w, "NN") for w in word_tokens]
         return [(w, tag, '') for w, tag in tagged]
 
-    @staticmethod
-    def _pos_tag_line(text):
-        """Legacy POS-only tagger; kept for _print_meter_analysis."""
-        word_tokens = re.findall(r'[A-Za-z]+', text)
-        if not word_tokens:
-            return []
-        try:
-            return nltk.pos_tag(word_tokens)
-        except Exception:
-            return [(w, "NN") for w in word_tokens]
-
-    def _print_meter_analysis(self, text):
-        """Write a forensic syllable/stress breakdown to the console."""
-        if not text.strip():
-            return
-        tagged = self._pos_tag_line(text)
-        tag_iter = iter(tagged)
-        print(f"\n[meter] {text!r}")
-        prev_word = None
-        for token in re.split(r'([A-Za-z]+)', text):
-            if not token or not re.match(r'[A-Za-z]+$', token):
-                continue
-            _, pos_tag = next(tag_iter, (token, "??"))
-            lower    = token.lower()
-            entries  = self._cmu.get(lower)
-            func_flag = self._is_function(token, pos_tag, prev_word)
-            sylls    = self._syllabify_word(token, func_flag)
-            phonemes = ' '.join(entries[0]) if entries else '(fallback)'
-            label    = " [func]" if func_flag else ""
-            rendered = []
-            for stext, stress in sylls:
-                if stress == 1:   rendered.append(stext.upper())
-                elif stress == 2: rendered.append(stext.capitalize())
-                else:             rendered.append(stext.lower())
-            print(f"  {token:<16} {pos_tag:<6}{label:<8} {phonemes:<36} → {SEP_DOT.join(rendered)}")
-            prev_word = token
-
     def _compose_meter_line_nltk(self, text):
         """
         Compose the full meter display string for a line (NLTK/CMUdict fallback).
@@ -2158,13 +2121,10 @@ class Editor:
         new_start = min(anchor, focus)
         new_end   = max(anchor, focus)
 
-        print(f"[update] old={old_start}-{old_end}, new={new_start}-{new_end}")
-
         # Clear rows that are no longer in the selection.
         if old_start is not None:
             for i in range(old_start, old_end + 1):
                 if i < len(self.lines) and not (new_start <= i <= new_end):
-                    print(f"  clearing row {i}")
                     self.lines[i][0].configure(bg="white")
 
         # Highlight rows in the new selection.
@@ -2351,7 +2311,6 @@ class Editor:
         if self._meter_var.get() and row < len(self._meter_rows):
             text = self.lines[row][0].get()
             self._fill_meter_widget(self._meter_rows[row], text)
-            self._print_meter_analysis(text)
 
     def _populate(self, n):
         for _ in range(n):
@@ -2407,14 +2366,12 @@ class Editor:
         return "break"
 
     def _on_click(self, row):
-        print(f"[click] row={row}, prev_sel={self._sel_anchor}-{self._sel_focus}")
         # Record click row for distinguishing single-line vs multi-line drag.
         self._click_row = row
         te = self.lines[row][0]
         self._click_index = te.index(tk.INSERT)
         # Clear any existing row selection on new click.
         self._clear_row_selection()
-        print(f"[click] after clear: sel={self._sel_anchor}-{self._sel_focus}, click_row={self._click_row}")
 
     def _on_drag(self, event):
         try:
@@ -2650,7 +2607,6 @@ class Editor:
                 if r < len(self._meter_rows):
                     text = self.lines[r][0].get()
                     self._fill_meter_widget(self._meter_rows[r], text)
-                    self._print_meter_analysis(text)
         return "break"
 
     def _trim_rows(self, target):
