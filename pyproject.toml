@@ -21,7 +21,7 @@ dependencies = [
 poetit = "poetit.app:main"
 
 [project.optional-dependencies]
-dev = ["build", "twine"]
+dev = ["build", "twine", "pytest>=8.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]
