@@ -1,4 +1,4 @@
-# Poedit
+# Poetit
 
 A desktop poetry editor with built-in meter analysis, rhyme lookup, thesaurus, dictionary, and dependency diagrams. Built with Python and tkinter.
 
@@ -13,13 +13,13 @@ This pulls in all dependencies including the spaCy English model. NLTK data (cmu
 ## Run
 
 ```bash
-poedit
+poetit
 ```
 
 Or:
 
 ```bash
-python -m poedit
+python -m poetit
 ```
 
 ## Features
