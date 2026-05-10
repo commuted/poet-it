@@ -1955,16 +1955,85 @@ class Editor:
     def _save(self):
         if self._current_path:
             self._write_files(self._current_path)
+        elif getattr(self, "_repo_path", None) and os.path.exists(self._repo_path):
+            self._save_as_in_repo()
         else:
             self._save_as()
 
     def _save_as(self):
-        path = filedialog.asksaveasfilename(
-            defaultextension=".txt",
-            filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
-        )
-        if path:
-            self._write_files(path)
+        if getattr(self, "_repo_path", None) and os.path.exists(self._repo_path):
+            self._save_as_in_repo()
+        else:
+            path = filedialog.asksaveasfilename(
+                defaultextension=".txt",
+                filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+            )
+            if path:
+                self._write_files(path)
+
+    def _save_as_in_repo(self):
+        """Save a new or renamed poem into the open repository."""
+        popup = tk.Toplevel(self.root)
+        popup.title("Save in Repository")
+        popup.transient(self.root)
+        popup.resizable(False, False)
+        popup.grab_set()
+
+        tk.Label(popup, text="File name:").pack(anchor="w", padx=12, pady=(12, 2))
+        name_var = tk.StringVar()
+        name_entry = tk.Entry(popup, textvariable=name_var, width=44)
+        name_entry.pack(anchor="w", padx=12)
+        name_entry.focus_set()
+        default = (os.path.basename(self._current_path)
+                   if self._current_path else "poem.txt")
+        name_entry.insert(0, default)
+        name_entry.select_range(0, tk.END)
+
+        tk.Label(
+            popup,
+            text=f"Repository: {os.path.basename(self._repo_path)}",
+            fg="gray", font=("TkDefaultFont", 9),
+        ).pack(anchor="w", padx=12, pady=(2, 10))
+
+        result = {"path": None, "export": False}
+
+        def _do_save():
+            fname = name_var.get().strip()
+            if not fname:
+                messagebox.showwarning("Error", "File name is required.", parent=popup)
+                return
+            if not fname.endswith(".txt"):
+                fname += ".txt"
+            dest = os.path.join(self._repo_path, fname)
+            if os.path.exists(dest) and dest != self._current_path:
+                if not messagebox.askyesno(
+                    "Overwrite", f"{fname} already exists. Overwrite?", parent=popup
+                ):
+                    return
+            result["path"] = dest
+            popup.destroy()
+
+        def _do_export():
+            result["export"] = True
+            popup.destroy()
+
+        btn_frame = tk.Frame(popup)
+        btn_frame.pack(fill="x", padx=12, pady=(0, 12))
+        tk.Button(btn_frame, text="Save in Repository", command=_do_save).pack(side="left")
+        tk.Button(btn_frame, text="Export to file…", command=_do_export).pack(side="right")
+        name_entry.bind("<Return>", lambda e: _do_save())
+
+        popup.wait_window()
+
+        if result["export"]:
+            path = filedialog.asksaveasfilename(
+                defaultextension=".txt",
+                filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+            )
+            if path:
+                self._write_files(path)
+        elif result["path"]:
+            self._write_files(result["path"])
 
     def _import(self):
         """Import a poem file by full canonical path into the current repo."""
