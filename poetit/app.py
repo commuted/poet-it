@@ -113,6 +113,9 @@ class Editor:
             except _dulwich_errors.NotGitRepository:
                 pass  # stale state entry, ignore
 
+        if _VCS_AVAILABLE and not self._repo_path:
+            self.root.after(200, self._prompt_repo_setup)
+
     # ------------------------------------------------------------------ #
     # Font
     # ------------------------------------------------------------------ #
@@ -273,6 +276,78 @@ class Editor:
         state["last_repo"] = repo_path
         with open(_STATE_FILE, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
+
+    def _prompt_repo_setup(self):
+        """Startup dialog to guide new users into creating a repository."""
+        docs = os.path.join(os.path.expanduser("~"), "Documents")
+        base = docs if os.path.isdir(docs) else os.path.expanduser("~")
+
+        popup = tk.Toplevel(self.root)
+        popup.title("Set Up a Repository")
+        popup.transient(self.root)
+        popup.resizable(False, False)
+        popup.grab_set()
+
+        tk.Label(
+            popup,
+            text="Poetit keeps your poems under version control.\nGive your poetry folder a name to get started.",
+            justify="left", padx=12, pady=(12, 4),
+        ).pack(anchor="w")
+
+        name_frame = tk.Frame(popup)
+        name_frame.pack(fill="x", padx=12, pady=(4, 0))
+        tk.Label(name_frame, text="Folder name:").pack(side="left")
+        name_var = tk.StringVar(value="poetry")
+        name_entry = tk.Entry(name_frame, textvariable=name_var, width=28)
+        name_entry.pack(side="left", padx=(8, 0))
+        name_entry.focus_set()
+        name_entry.select_range(0, tk.END)
+
+        tk.Label(
+            popup,
+            text=f"Location: {base}",
+            fg="#555", font=("Helvetica", 9),
+            padx=12,
+        ).pack(anchor="w", pady=(2, 8))
+
+        def _do_setup():
+            name = name_var.get().strip()
+            if not name:
+                messagebox.showwarning("Name required", "Please enter a folder name.", parent=popup)
+                return
+            repo_dir = os.path.join(base, name)
+            if os.path.exists(repo_dir):
+                try:
+                    Repo(repo_dir).close()
+                    self._repo_path = repo_dir
+                    self._save_repo_state(repo_dir)
+                    self._update_title()
+                    popup.destroy()
+                    return
+                except _dulwich_errors.NotGitRepository:
+                    if not messagebox.askyesno(
+                        "Folder exists",
+                        f'"{repo_dir}" exists but is not a repository.\nInitialise it as one?',
+                        parent=popup,
+                    ):
+                        return
+            try:
+                os.makedirs(repo_dir, exist_ok=True)
+                Repo.init(repo_dir)
+                self._repo_path = repo_dir
+                self._save_repo_state(repo_dir)
+                self._update_title()
+                popup.destroy()
+            except Exception as exc:
+                messagebox.showerror("Error", f"Could not create repository:\n{exc}", parent=popup)
+
+        btn_frame = tk.Frame(popup)
+        btn_frame.pack(pady=(0, 12))
+        tk.Button(btn_frame, text="Set Up Repository", command=_do_setup, default="active").pack(
+            side="left", padx=8
+        )
+        tk.Button(btn_frame, text="Skip for now", command=popup.destroy).pack(side="left", padx=8)
+        name_entry.bind("<Return>", lambda e: _do_setup())
 
     def _new_repo(self):
         """Create a new git repository and set up the poems directory."""
@@ -673,7 +748,7 @@ class Editor:
         popup = tk.Toplevel(self.root)
         popup.title("Version Tree")
         popup.transient(self.root)
-        popup.geometry("650x500")
+        popup.geometry("560x500")
 
         from datetime import datetime
         repo = Repo(self._repo_path)
@@ -711,17 +786,30 @@ class Editor:
                 return
         repo.close()
 
-        # Status bar at the bottom
-        status_var = tk.StringVar(value="Click a version to load it into the editor.")
+        # Header bar — close button + poem name
+        header = tk.Frame(popup, bg="#dde8ff", pady=4)
+        header.pack(fill="x", side="top")
+        tk.Button(
+            header, text="Close", command=popup.destroy,
+            relief="raised", padx=8,
+        ).pack(side="left", padx=(8, 12))
+        poem_name_var = tk.StringVar(value="")
+        tk.Label(
+            header, textvariable=poem_name_var,
+            font=("TkDefaultFont", 11, "bold"), bg="#dde8ff", anchor="w",
+        ).pack(side="left", fill="x")
 
-        # Build a canvas-based tree view
-        cv = tk.Canvas(popup, bg="white")
-        v_sb = tk.Scrollbar(popup, orient="vertical", command=cv.yview)
-        cv.configure(yscrollcommand=v_sb.set)
-        cv.pack(side="left", fill="both", expand=True)
+        tk.Label(
+            popup, text="View Version", font=("TkDefaultFont", 10),
+            anchor="w", padx=8, pady=3,
+        ).pack(fill="x", side="top")
+
+        # Build a canvas-based tree view (scrollbar first so canvas expands into remaining space)
+        v_sb = tk.Scrollbar(popup, orient="vertical")
         v_sb.pack(side="right", fill="y")
-
-        tk.Label(popup, textvariable=status_var, anchor="w", relief="sunken", bd=1).pack(fill="x", padx=2, pady=2)
+        cv = tk.Canvas(popup, bg="white", yscrollcommand=v_sb.set)
+        v_sb.configure(command=cv.yview)
+        cv.pack(side="left", fill="both", expand=True)
 
         inner = tk.Frame(cv, bg="white")
         cv.create_window((0, 0), window=inner, anchor="nw")
@@ -750,37 +838,96 @@ class Editor:
         if active_file:
             commits = [c for c in commits if active_file in c["files"]]
 
-        # Show file indicator in status
+        # Populate header with poem name
         if active_file:
-            status_var.set(f"Showing: {active_file}  —  click a version to load it.")
+            poem_name_var.set(os.path.splitext(active_file)[0])
         else:
-            status_var.set("No poem files found in this repository.")
+            poem_name_var.set("No poems found")
 
-        def _load_version(c):
-            """Load a specific version into the editor."""
-            if not active_file:
-                status_var.set("No active file to load.")
+        def _select_version(sha_full):
+            """Scrape editor, show commit/discard if changed, then load this version."""
+            def _do_load():
+                data = self._load_blob_at_path(sha_full, active_file)
+                if data is None:
+                    messagebox.showerror("Error", "Could not load version.")
+                    return
+                text = data.decode("utf-8", errors="replace")
+                self._load_text_into_editor(text)
+                self._current_path = os.path.join(self._repo_path, active_file)
+                self._mark_clean()
+                self._update_title()
+
+            # Scrape editor and compare against file on disk
+            editor_lines = [te.get() for te, _ in self.lines]
+            while editor_lines and not editor_lines[-1]:
+                editor_lines.pop()
+            editor_text = "\n".join(editor_lines) + "\n" if editor_lines else ""
+
+            has_changes = False
+            if self._current_path and os.path.exists(self._current_path):
+                try:
+                    with open(self._current_path, "r", encoding="utf-8") as fh:
+                        has_changes = fh.read() != editor_text
+                except Exception:
+                    has_changes = True
+            else:
+                has_changes = bool(editor_text.strip())
+
+            if not has_changes:
+                popup.destroy()
+                _do_load()
                 return
 
-            if active_file not in c["files"]:
-                status_var.set(f"{active_file} not in this version.")
-                return
+            name = os.path.basename(self._current_path) if self._current_path else "Untitled"
+            dlg = tk.Toplevel(popup)
+            dlg.title("Unsaved Changes")
+            dlg.transient(popup)
+            dlg.resizable(False, False)
+            dlg.grab_set()
 
-            data = self._load_blob_at_path(c["sha_full"], active_file)
-            if data is None:
-                status_var.set(f"Could not load {active_file} from {c['sha']}")
-                return
-            text = data.decode("utf-8", errors="replace")
-            self._load_text_into_editor(text)
-            self._current_path = os.path.join(self._repo_path, active_file)
-            self._mark_clean()
-            self._update_title()
-            status_var.set(f"Loaded: {active_file} @ {c['sha']}  |  {c['message']}")
+            tk.Label(
+                dlg,
+                text=f'"{name}" has unsaved changes.\nCommit before loading the selected version?',
+                justify="left", padx=14, pady=(12, 6),
+            ).pack(anchor="w")
+
+            bf = tk.Frame(dlg)
+            bf.pack(pady=(0, 12))
+
+            def _commit_and_load():
+                now_str = self._timestamp_now()
+                msg_var = tk.StringVar(value=now_str)
+                vdlg = tk.Toplevel(dlg)
+                vdlg.title("Make Version")
+                vdlg.transient(dlg)
+                vdlg.resizable(False, False)
+                vdlg.grab_set()
+                tk.Label(vdlg, text="Version message:").pack(anchor="w", padx=12, pady=(8, 2))
+                entry = tk.Entry(vdlg, textvariable=msg_var, width=40)
+                entry.pack(padx=12)
+                entry.focus_set()
+                entry.select_range(0, tk.END)
+                def _do_commit():
+                    msg = msg_var.get().strip() or now_str
+                    self._do_commit_and_stage(msg)
+                    vdlg.destroy()
+                    dlg.destroy()
+                    popup.destroy()
+                    _do_load()
+                tk.Button(vdlg, text="Commit", command=_do_commit, default="active").pack(pady=10)
+                entry.bind("<Return>", lambda e: _do_commit())
+
+            def _discard_and_load():
+                dlg.destroy()
+                popup.destroy()
+                _do_load()
+
+            tk.Button(bf, text="Commit", command=_commit_and_load, default="active").pack(side="left", padx=8)
+            tk.Button(bf, text="Discard", command=_discard_and_load).pack(side="left", padx=8)
 
         # Simple linear layout with parent lines
         for i, c in enumerate(commits):
             y = i * y_step + 20
-            # Determine column based on parent branching
             col = 0
             if c["parents"]:
                 parent_idx = sha_to_idx.get(c["parents"][0])
@@ -789,16 +936,15 @@ class Editor:
 
             x = x_base + col * col_step
 
-            # Draw connector line to parent
             if c["parents"]:
                 parent_idx = sha_to_idx.get(c["parents"][0])
                 if parent_idx is not None:
                     py = parent_idx * y_step + 20
                     cv.create_line(x, py + 20, x, y - 10, fill="#888", width=2)
 
-            # Commit node — clickable
+            # Commit node — click to load (with commit/discard guard)
             node = tk.Frame(inner, bg="#e8f0ff", bd=1, relief="solid", cursor="hand2")
-            node.place(x=x, y=y, width=380, height=40)
+            node.place(x=x, y=y, width=440, height=40)
 
             lbl1 = tk.Label(
                 node, text=f'{c["sha"]}  {c["time"]}',
@@ -806,53 +952,16 @@ class Editor:
             )
             lbl1.pack(fill="x", padx=4, pady=(2, 0))
             lbl2 = tk.Label(
-                node, text=c["message"][:60],
+                node, text=c["message"][:70],
                 font=("TkDefaultFont", 9, "bold"), bg="#e8f0ff", anchor="w",
             )
             lbl2.pack(fill="x", padx=4)
 
-            # Bind click on node and all its children
             for w in (node, lbl1, lbl2):
-                w.bind("<Button-1>", lambda e, cc=c: _load_version(cc))
+                w.bind("<Button-1>", lambda e, sha=c["sha_full"]: _select_version(sha))
 
-            # Fork button
-            btn_frame = tk.Frame(inner, bg="white")
-            btn_frame.place(x=x + 390, y=y + 10)
-
-            tk.Button(
-                btn_frame, text="Fork", font=("TkDefaultFont", 8),
-                command=lambda sha=c["sha_full"], msg=c["message"]: _fork_to_head(sha, msg, popup),
-            ).pack(side="top")
-
-        # Set inner frame size
         total_h = max(len(commits) * y_step + 80, 400)
-        inner.configure(width=560, height=total_h)
-
-        def _fork_to_head(sha, msg, win):
-            """Create a new branch from the selected commit and set HEAD to it."""
-            sha_short = sha[:8] if isinstance(sha, (str, bytes)) else sha.decode()[:8]
-            from datetime import datetime
-            branch_name = f"fork-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            if msg:
-                branch_name += f"-{msg[:20].replace(' ', '-')}"
-            if not messagebox.askyesno(
-                "Fork Branch",
-                f"Create branch '{branch_name}' at {sha_short} and check it out?",
-            ):
-                return
-            try:
-                repo = Repo(self._repo_path)
-                # Create branch ref
-                ref_name = f"refs/heads/{branch_name}"
-                repo.refs[ref_name.encode()] = sha
-                # Point HEAD to the new branch
-                repo.refs[b"HEAD"] = ref_name.encode()
-                repo.close()
-                messagebox.showinfo("Fork", f"Created and checked out:\n{branch_name}")
-                win.destroy()
-                self._show_version_tree()  # refresh
-            except Exception as exc:
-                messagebox.showerror("Error", str(exc))
+        inner.configure(width=500, height=total_h)
 
     # ------------------------------------------------------------------ #
     # Rhyme UI
