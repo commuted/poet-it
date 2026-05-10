@@ -1,6 +1,8 @@
 # Poetit
 
-A desktop poetry editor with built-in meter analysis, rhyme lookup, thesaurus, dictionary, and dependency diagrams. Built with Python and tkinter.
+A desktop poetry editor with built-in syllable counting, meter analysis, rhyme detection, thesaurus, dictionary, dependency diagrams, and git-based version control. Built with Python and tkinter — no Electron, no browser.
+
+---
 
 ## Install
 
@@ -8,7 +10,22 @@ A desktop poetry editor with built-in meter analysis, rhyme lookup, thesaurus, d
 pip install -e .
 ```
 
-This pulls in all dependencies including the spaCy English model. NLTK data (cmudict, wordnet, punkt) is downloaded automatically on first launch.
+For the full feature set install the optional extras:
+
+```bash
+pip install spacy resvg_py Pillow
+python -m spacy download en_core_web_md
+```
+
+| Feature | Requires |
+|---|---|
+| Meter analysis (enhanced) | `prosodic` |
+| Dependency diagram | `spacy`, `resvg_py`, `Pillow` |
+| Version control | `dulwich` (included by default) |
+
+NLTK data (punkt tokenizer, POS tagger) is downloaded automatically on first launch if not already present. CMUDict and WordNet are bundled with the package — no separate download needed.
+
+---
 
 ## Run
 
@@ -16,58 +33,144 @@ This pulls in all dependencies including the spaCy English model. NLTK data (cmu
 poetit
 ```
 
-Or:
+or
 
 ```bash
 python -m poetit
 ```
 
+---
+
 ## Features
 
-### Editing
+### Line-by-line editing
 
-Each line of the poem occupies its own row. Press **Enter** to create a new line and move down. Press **BackSpace** on an empty line at cursor position 0 to delete the line and move up. **Up/Down** arrows and **Tab** navigate between lines.
+Each line of the poem is its own row. The editor behaves like a structured notepad rather than a free-form text area.
+
+| Key | Action |
+|---|---|
+| Enter | Split line / create new line below |
+| Backspace at position 0 | Merge line upward and delete row |
+| Up / Down arrows | Move between lines |
+| Tab | Move to next line |
+| Ctrl+Z / Ctrl+Y | Undo / Redo |
+
+Multi-line paste is supported — pasted text is split on newlines and distributed into rows automatically.
 
 ### Syllable counts
 
-A grey margin column to the right of each line shows its syllable count, computed from CMU Pronouncing Dictionary entries with NLTK's SyllableTokenizer as a fallback.
+A grey margin column to the right of each line shows its syllable count. Counts come from the bundled CMU Pronouncing Dictionary, with NLTK's SyllableTokenizer as a fallback for words not in the dictionary.
 
 ### Rhyme scheme
 
-A green column on the far right displays the rhyme scheme letter for each line. Rhyme detection uses phoneme-suffix equality from cmudict — two words are assigned the same letter when their phonemes from the last stressed vowel onward are identical.
+A column on the far right displays the rhyme scheme letter for each line (A, B, C …). Two lines share a letter when their final words share the same phoneme suffix from the last stressed vowel onward (CMUDict-based). Blank lines get no letter.
 
 ### Meter
 
-Click the **Meter** toolbar button to toggle a meter display above each line. Stress is shown by letter case:
+Click **Meter** in the toolbar to toggle a stress-marked display above each line. Stress is shown by letter case:
+
+```
+SHALL i com·PARE thee TO a SUM·mers DAY
+```
 
 - **UPPERCASE** — primary stress
 - **Capitalized** — secondary stress
 - **lowercase** — unstressed
+- **·** — syllable boundary
 
-Syllable boundaries are marked with a middle dot (·). Function words (determiners, auxiliaries, prepositions, etc.) are automatically detected and destressed. When the `prosodic` library is available, it is preferred for metrically-informed stress analysis; otherwise NLTK + cmudict with POS tagging is used.
+Function words (determiners, auxiliaries, prepositions, conjunctions, etc.) are automatically destressed. If the `prosodic` library is installed it is used for metrically-informed parsing; otherwise NLTK POS tagging with CMUDict stress values is used.
 
-### Rhyme
+### Rhyme lookup
 
-Click in a line to position the cursor on or after a word, then click **Rhyme** to see a popup of rhyming words. Click a rhyme to replace the word in your poem. You can also type a word directly into the lookup field that appears next to the Rhyme button and press Enter.
+Click anywhere on a word in a line, then click **Rhyme** to see a scrollable list of rhyming words. Click a word in the list to replace the word under the cursor. You can also type a word directly into the lookup field beside the Rhyme button and press Enter.
 
 ### Definition
 
-Position the cursor on a word and click **Definition** to see its WordNet definitions grouped by part of speech, with synonyms and usage examples.
+Click on a word then click **Definition** to see its WordNet entries grouped by part of speech, with synonyms and usage examples. Bundled WordNet data — no download required.
 
 ### Thesaurus
 
-Position the cursor on a word and click **Thesaurus** to see a list of synonyms. Click a synonym to replace the word in your poem.
+Click on a word then click **Thesaurus** to see synonyms. Click a synonym to replace the word in your poem.
 
 ### Dependency diagram
 
-Position the cursor on a line and click **Diagram** to render a spaCy dependency parse of that line. The diagram shows grammatical relationships between words, with POS and dependency labels in an annotation row above the tree.
+Click on a line then click **Diagram** to render a spaCy dependency parse of that line. Shows the grammatical relationships between words, with POS tags and dependency labels. Requires `spacy`, `resvg_py`, and `Pillow`.
 
-### File operations
+---
 
-- **File → Open** — load a `.txt` file (UTF-8)
-- **File → Save / Save As** — save the poem as `.txt` with a sidecar `.txt.meta` JSON file that stores font settings and per-line formatting metadata
-- **File → New** — clear the editor (prompts to save if there are unsaved changes)
+## Version control
 
-### Font
+Poetit uses git (via `dulwich`) to keep a history of every version of your poem. No git installation required — dulwich is a pure-Python git implementation.
 
-The **Font** and **Size** menus let you change the editor typeface. Font choice is persisted in the `.meta` file.
+### First launch
+
+On first launch, Poetit offers to create a poetry repository folder (default: `~/Documents/poetry`). You can skip this and set it up later via **File → New Repository**.
+
+### Repository operations
+
+| Menu item | What it does |
+|---|---|
+| File → Open Repository | Open an existing git repository and browse its poems |
+| File → New Repository | Create a new git repository and optionally migrate the current poem into it |
+| File → Import… | Copy an external `.txt` file into the open repository |
+| File → Export… | Save the current poem to a path outside the repository |
+
+### Making versions
+
+Click **Make Version** in the toolbar to commit the current poem. A dialog prompts for a version message (pre-filled with the current timestamp). Each commit snapshots the poem file and its metadata.
+
+### Version Tree
+
+Click **Version Tree** to browse the commit history for the current poem. Click any version card to load it into the editor. If you have unsaved edits, a **Commit / Discard** dialog appears first:
+
+- **Commit** — opens the Make Version dialog to save your current work before switching
+- **Discard** — discards unsaved edits and loads the selected version
+
+---
+
+## File format
+
+Each poem is saved as a plain UTF-8 `.txt` file. A sidecar `.txt.meta` JSON file stores font settings and per-character run metadata. The `.meta` file is committed to the repository alongside the poem.
+
+---
+
+## Menu reference
+
+**File**
+
+| Item | Action |
+|---|---|
+| New | Clear the editor (prompts to save if dirty) |
+| Open… | Open a `.txt` file from anywhere on disk |
+| Save | Save to the current path; if inside a repo, prompts for a filename |
+| Save As… | Save to a new path |
+| Open Repository | Open an existing git repo |
+| New Repository | Create a new git repo |
+| Import… | Bring an external file into the repo |
+| Export… | Write the poem to a file outside the repo |
+| Exit | Quit (prompts to save if dirty) |
+
+**Font / Size** — change the editor typeface and size. Font choice is persisted in the `.meta` file.
+
+---
+
+## Development
+
+```bash
+pip install -e ".[dev]"   # includes pytest
+python -m pytest tests/ -v
+```
+
+Tests cover `file_io` (round-trip write/read, metadata, edge cases) and `linguistics` (syllable counting, rhyme scheme, rhyme lookup, stress detection, word-at-cursor).
+
+---
+
+## Requirements
+
+- Python ≥ 3.10
+- nltk ≥ 3.8
+- prosodic ≥ 3.0
+- spacy ≥ 3.8 *(optional — diagram feature)*
+- resvg_py ≥ 0.3 *(optional — diagram rendering)*
+- Pillow ≥ 9.0 *(optional — diagram display)*
+- dulwich ≥ 0.22 *(version control)*
