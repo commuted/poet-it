@@ -199,7 +199,7 @@ class Editor:
 
     def _about_click(self):
         popup = tk.Toplevel(self.root)
-        popup.title("About Poedit")
+        popup.title("About Poetit")
         popup.transient(self.root)
         popup.resizable(False, False)
 
@@ -1920,7 +1920,7 @@ class Editor:
     def _update_title(self):
         name  = os.path.basename(self._current_path) if self._current_path else "Untitled"
         dirty = " \u2022" if self._is_dirty else ""   # bullet = unsaved indicator
-        self.root.title(f"{name}{dirty} — Poedit")
+        self.root.title(f"{name}{dirty} — Poetit")
 
     def _mark_dirty(self):
         if not self._is_dirty:
@@ -2284,9 +2284,28 @@ class Editor:
         return result.get("ok", False)
 
 
+def _load_icon(master=None):
+    """Return a PhotoImage for the app icon, or None on failure."""
+    try:
+        from importlib.resources import files
+        icon_path = str(files('poetit').joinpath('data', 'icon.png'))
+    except Exception:
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'icon.png')
+    try:
+        from PIL import Image as _PILImage, ImageTk as _PILImageTk
+        img = _PILImage.open(icon_path).resize((64, 64), _PILImage.LANCZOS)
+        return _PILImageTk.PhotoImage(img, master=master)
+    except Exception:
+        return None
+
+
 def main():
     root = tk.Tk()
     root.withdraw()
+
+    _icon = _load_icon(master=root)
+    if _icon:
+        root.iconphoto(True, _icon)
 
     splash = tk.Toplevel(root)
     splash.overrideredirect(True)
@@ -2310,7 +2329,7 @@ def main():
     if _splash_img:
         tk.Label(splash, image=_splash_img, bg="black").pack()
     else:
-        tk.Label(splash, text="Poedit", font=("Courier", 28, "bold"),
+        tk.Label(splash, text="Poetit", font=("Courier", 28, "bold"),
                  fg="#c9a84c", bg="#1a1a1a", width=40, height=10).pack()
 
     status_var = tk.StringVar(value="Initializing…")

@@ -1,0 +1,56 @@
+name: poetit
+version: '0.1.0'
+summary: Desktop poetry editor with meter, rhyme, and version control
+description: |
+  Poetit is a line-by-line poetry editor built with Python and tkinter.
+
+  Features:
+    - Syllable counts via bundled CMU Pronouncing Dictionary
+    - Stress-marked meter display (prosodic or NLTK fallback)
+    - Rhyme scheme detection and word-level rhyme lookup
+    - Thesaurus and WordNet definitions (bundled)
+    - Dependency-parse diagrams via spaCy (optional)
+    - Git-based version control with commit history browser
+
+  No Electron, no browser — pure Python desktop app.
+
+grade: devel        # change to 'stable' for a release
+confinement: strict
+base: core22
+
+parts:
+  poetit:
+    plugin: python
+    source: .
+    python-packages:
+      - .
+    stage-packages:
+      - python3-tk
+      - libpython3-stdlib
+      # Tk theme support
+      - tk8.6-blt2.5
+
+  # spaCy English model — download at build time
+  # Remove this part if you do not want diagram support.
+  spacy-model:
+    plugin: nil
+    after: [poetit]
+    override-build: |
+      $SNAPCRAFT_PART_INSTALL/../poetit/bin/python -m spacy download en_core_web_md
+
+apps:
+  poetit:
+    command: bin/poetit
+    extensions: [gnome]
+    environment:
+      PYTHONPATH: $SNAP/lib/python3.10/site-packages
+      TCL_LIBRARY: $SNAP/usr/share/tcltk/tcl8.6
+      TK_LIBRARY:  $SNAP/usr/share/tcltk/tk8.6
+    plugs:
+      - home
+      - network          # for NLTK fallback downloads
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+      - opengl

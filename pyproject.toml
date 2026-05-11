@@ -5,27 +5,73 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "poetit"
 version = "0.1.0"
-description = "Poetry editor with meter analysis, rhyme lookup, thesaurus, and dependency diagrams"
+description = "Desktop poetry editor with meter analysis, rhyme lookup, thesaurus, and version control"
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+authors = [
+    { name = "Ron Hinchley", email = "commuted@gmail.com" },
+]
+keywords = ["poetry", "editor", "meter", "rhyme", "linguistics", "tkinter", "gui"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications",
+    "Environment :: MacOS X",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Editors",
+    "Topic :: Artistic Software",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
+
+[project.urls]
+Homepage    = "https://github.com/commuted/poetit"
+Repository  = "https://github.com/commuted/poetit"
+"Bug Tracker" = "https://github.com/commuted/poetit/issues"
+
+# Core dependencies — enough to run the editor with all basic features.
+# CMUDict and WordNet are bundled; no separate NLTK download required.
 dependencies = [
     "nltk>=3.8",
-    "prosodic>=3.0",
-    "spacy>=3.8",
-    "resvg_py>=0.3",
-    "Pillow>=9.0",
     "dulwich>=0.22",
+    "Pillow>=9.0",
 ]
+
+[project.optional-dependencies]
+# Enhanced stress analysis via the prosodic scansion library
+meter   = ["prosodic>=3.0"]
+# Dependency-parse diagram (requires a spaCy English model too:
+#   python -m spacy download en_core_web_md)
+diagram = ["spacy>=3.8", "resvg_py>=0.3"]
+# Everything
+full    = ["prosodic>=3.0", "spacy>=3.8", "resvg_py>=0.3"]
+dev     = ["build", "twine", "pytest>=8.0"]
 
 [project.scripts]
 poetit = "poetit.app:main"
 
-[project.optional-dependencies]
-dev = ["build", "twine", "pytest>=8.0"]
+[project.gui-scripts]
+poetit-gui = "poetit.app:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where   = ["."]
 include = ["poetit", "poetit.*"]
 
 [tool.setuptools.package-data]
-"poetit" = ["data/*.js", "data/*.dict", "data/corpora/*.zip"]
+"poetit" = [
+    "data/*.js",
+    "data/*.dict",
+    "data/*.png",
+    "data/*.desktop",
+    "data/corpora/*.zip",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
