@@ -30,14 +30,8 @@ classifiers = [
     "Topic :: Artistic Software",
     "Topic :: Multimedia :: Sound/Audio :: Speech",
 ]
-
-[project.urls]
-Homepage    = "https://github.com/commuted/poetit"
-Repository  = "https://github.com/commuted/poetit"
-"Bug Tracker" = "https://github.com/commuted/poetit/issues"
-
-# CMUDict and WordNet are bundled; no separate NLTK data download required.
-# After install, run: python -m spacy download en_core_web_md
+# CMUDict and WordNet are bundled — no separate NLTK data download needed.
+# Stanza downloads its English model automatically on first use.
 dependencies = [
     "nltk>=3.8",
     "prosodic>=3.0",
@@ -46,6 +40,11 @@ dependencies = [
     "Pillow>=9.0",
     "dulwich>=0.22",
 ]
+
+[project.urls]
+Homepage      = "https://github.com/commuted/poetit"
+Repository    = "https://github.com/commuted/poetit"
+"Bug Tracker" = "https://github.com/commuted/poetit/issues"
 
 [project.optional-dependencies]
 dev = ["build", "twine", "pytest>=8.0"]
