@@ -19,6 +19,12 @@ try:
 except ImportError:
     STANZA_AVAILABLE = False
 
+try:
+    from spellchecker import SpellChecker as _SpellChecker
+    SPELLCHECKER_AVAILABLE = True
+except ImportError:
+    SPELLCHECKER_AVAILABLE = False
+
 SEP_DOT = "·"
 
 _WEAK_DEPS = frozenset({
@@ -141,6 +147,7 @@ class Linguistics:
         self._stanza_lock        = threading.Lock()
         self._stanza_nlp         = None
         self._stanza_loading     = False
+        self._spell              = _SpellChecker() if SPELLCHECKER_AVAILABLE else None
 
     def start_background_loads(self):
         if STANZA_AVAILABLE:
@@ -317,6 +324,27 @@ class Linguistics:
                 seen.add(sl)
                 result.append(s)
         return result
+
+    # ------------------------------------------------------------------ #
+    # Spell checking
+    # ------------------------------------------------------------------ #
+
+    def check_spelling(self, word):
+        """Return (is_correct, [suggestions]) for word.
+
+        is_correct is True when the word is in the dictionary.
+        suggestions is a list of candidates sorted by edit distance,
+        empty when the word is correct or pyspellchecker is unavailable.
+        """
+        if self._spell is None:
+            return True, []
+        lower = word.lower()
+        if not self._spell.unknown([lower]):
+            return True, []
+        candidates = self._spell.candidates(lower) or set()
+        candidates.discard(lower)
+        ranked = sorted(candidates, key=lambda w: self._spell.word_usage_frequency(w), reverse=True)
+        return False, ranked
 
     # ------------------------------------------------------------------ #
     # Stanza

@@ -204,6 +204,35 @@ class Editor:
             return
         messagebox.showinfo("Thesaurus", "Click in your poem first, then press Thesaurus.")
 
+    def _spell_click(self):
+        if self._last_focus_row is None:
+            messagebox.showinfo("Spell Check", "Click in your poem first, then press Spell.")
+            return
+        row  = self._last_focus_row
+        te   = self.lines[row][0]
+        text = te.get()
+        try:
+            cursor = te.index(tk.INSERT)
+        except tk.TclError:
+            cursor = self._last_focus_cursor
+        word, ws, we = word_at_cursor(text, cursor)
+        if not word:
+            messagebox.showinfo("Spell Check", "Place the cursor on or after a word.")
+            return
+        correct, suggestions = self._nlp.check_spelling(word)
+        if correct:
+            messagebox.showinfo("Spell Check", f'"{word}" is spelled correctly.')
+            return
+        if not suggestions:
+            messagebox.showinfo("Spell Check", f'"{word}" — no suggestions found.')
+            return
+        popups.show_word_list_popup(
+            self.root, f'Spell: "{word}"',
+            f'Click to replace in line {row + 1}:',
+            suggestions,
+            lambda s: self._insert_word(s, row, ws, we),
+        )
+
     def _about_click(self):
         popup = tk.Toplevel(self.root)
         popup.title("About Poetit")
@@ -1259,6 +1288,11 @@ class Editor:
 
         tk.Button(
             tb, text="Thesaurus", command=self._thesaurus_click,
+            relief="raised", padx=8, pady=2,
+        ).pack(side="left", padx=(0, 6), pady=3)
+
+        tk.Button(
+            tb, text="Spell", command=self._spell_click,
             relief="raised", padx=8, pady=2,
         ).pack(side="left", padx=(0, 6), pady=3)
 

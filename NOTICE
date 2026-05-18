@@ -29,6 +29,11 @@ Pillow (PIL Fork)
   License: HPND (Historical Permission Notice and Disclaimer) / MIT-CMU
   https://python-pillow.org/
 
+pyspellchecker
+  Copyright (c) 2018-2021 Tyler Barrus
+  License: MIT License
+  https://github.com/barrust/pyspellchecker
+
 Rhyming dictionary data (rdict.js)
   Bundled data file from an external rhyming dictionary source.
 
