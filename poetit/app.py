@@ -99,6 +99,14 @@ class Editor:
         self._meter_loading = False
         self._meter_gen     = 0
 
+        self._spell_var        = tk.BooleanVar(value=False)
+        self._spell_errors     = {}   # te_widget → [(word, start, end, suggestions), ...]
+        self._spell_underlines = {}   # te_widget → tk.Canvas (underline bar)
+        self._spell_popup      = None
+        self._spell_hover_te   = None
+        self._spell_hover_span = None
+        self._spell_after_id   = None
+
         sys_fonts = set(tkfont.families())
         self._avail_fonts = [f for f in _FONT_CANDIDATES if f in sys_fonts]
         if not self._avail_fonts:
@@ -204,34 +212,238 @@ class Editor:
             return
         messagebox.showinfo("Thesaurus", "Click in your poem first, then press Thesaurus.")
 
-    def _spell_click(self):
-        if self._last_focus_row is None:
-            messagebox.showinfo("Spell Check", "Click in your poem first, then press Spell.")
-            return
-        row  = self._last_focus_row
-        te   = self.lines[row][0]
+    def _toggle_spell(self):
+        if self._spell_var.get():
+            self._spell_activate()
+        else:
+            self._spell_deactivate()
+
+    def _spell_activate(self):
+        for te, _ in self.lines:
+            self._spell_scan_row(te)
+            self._spell_create_underline(te)
+            te.bind('<Motion>', lambda e, t=te: self._spell_on_motion(t, e))
+
+    def _spell_deactivate(self):
+        self._spell_close_popup(warp_to_safety=False)
+        for te, _ in self.lines:
+            self._spell_destroy_underline(te)
+            te.unbind('<Motion>')
+        self._spell_errors.clear()
+        self._spell_hover_te = None
+        self._spell_hover_span = None
+
+    def _spell_scan_row(self, te):
+        import re as _re
         text = te.get()
+        errors = []
+        for m in _re.finditer(r'[A-Za-z]+', text):
+            word = m.group()
+            correct, suggestions = self._nlp.check_spelling(word)
+            if not correct:
+                errors.append((word, m.start(), m.end(), suggestions))
+        self._spell_errors[te] = errors
+
+    def _spell_create_underline(self, te):
+        if te in self._spell_underlines:
+            return
+        uc = tk.Canvas(self.inner, height=2, bg='white', highlightthickness=0, bd=0)
+        # Place the 2-px canvas at the very bottom of the entry, inside its own space.
+        # anchor='sw' pins the canvas's bottom-left to (te.x, te.y + te.height).
+        uc.place(in_=te, relx=0, rely=1.0, relwidth=1.0, height=2, anchor='sw')
+        uc.tk.call('raise', uc._w, te._w)
+        def _uc_click(e, t=te):
+            if self._spell_popup is not None:
+                self._spell_close_popup(warp_to_safety=False)
+            t.focus_set()
+            try:
+                t.icursor(t.index(f'@{e.x}'))
+            except tk.TclError:
+                pass
+        uc.bind('<Button-1>', _uc_click)
+        uc.bind('<Motion>',   lambda e, t=te: self._spell_on_motion(t, e))
+        self._spell_underlines[te] = uc
+        self._spell_draw_underlines(te)
+
+    def _spell_destroy_underline(self, te):
+        uc = self._spell_underlines.pop(te, None)
+        if uc:
+            try:
+                uc.destroy()
+            except tk.TclError:
+                pass
+
+    def _spell_draw_underlines(self, te):
+        uc = self._spell_underlines.get(te)
+        if uc is None:
+            return
+        uc.delete('all')
+        errors = self._spell_errors.get(te, [])
+        for word, start, end, suggestions in errors:
+            try:
+                bx0 = te.tk.call(te._w, 'bbox', start)
+                bx1 = te.tk.call(te._w, 'bbox', end - 1)
+                x1 = int(bx0[0])
+                x2 = int(bx1[0]) + int(bx1[2])
+            except (tk.TclError, IndexError, ValueError):
+                continue
+            uc.create_rectangle(x1, 0, x2, 2, fill='#dd0000', outline='')
+
+    def _spell_on_motion(self, te, event):
+        if not self._spell_var.get():
+            return
         try:
-            cursor = te.index(tk.INSERT)
-        except tk.TclError:
-            cursor = self._last_focus_cursor
-        word, ws, we = word_at_cursor(text, cursor)
-        if not word:
-            messagebox.showinfo("Spell Check", "Place the cursor on or after a word.")
+            char_idx = int(te.index(f'@{event.x}'))
+        except (tk.TclError, ValueError):
             return
-        correct, suggestions = self._nlp.check_spelling(word)
-        if correct:
-            messagebox.showinfo("Spell Check", f'"{word}" is spelled correctly.')
+        errors = self._spell_errors.get(te, [])
+        hover_word = None
+        for entry in errors:
+            word, start, end, suggestions = entry
+            if start <= char_idx < end:
+                hover_word = entry
+                break
+        if hover_word:
+            span = (hover_word[1], hover_word[2])
+            if self._spell_hover_te is te and self._spell_hover_span == span:
+                return
+            self._spell_close_popup(warp_to_safety=False)
+            self._spell_hover_te = te
+            self._spell_hover_span = span
+            if self._spell_after_id:
+                self.root.after_cancel(self._spell_after_id)
+            self._spell_after_id = self.root.after(
+                280, lambda w=hover_word: self._spell_show_popup(te, w)
+            )
+        else:
+            if self._spell_after_id:
+                self.root.after_cancel(self._spell_after_id)
+                self._spell_after_id = None
+            # If a popup is already showing, let its own <Leave> handler close it.
+            # Do NOT close it from here — that would race with the cursor warp.
+            if self._spell_popup is None:
+                self._spell_hover_te = None
+                self._spell_hover_span = None
+
+    def _spell_show_popup(self, te, hover_word):
+        word, start, end, suggestions = hover_word
+        if not self._spell_var.get():
             return
-        if not suggestions:
-            messagebox.showinfo("Spell Check", f'"{word}" — no suggestions found.')
+        if self._spell_hover_te is not te or self._spell_hover_span != (start, end):
             return
-        popups.show_word_list_popup(
-            self.root, f'Spell: "{word}"',
-            f'Click to replace in line {row + 1}:',
-            suggestions,
-            lambda s: self._insert_word(s, row, ws, we),
-        )
+
+        try:
+            bx = te.tk.call(te._w, 'bbox', start)
+            x_rel = int(bx[0])
+        except (tk.TclError, IndexError, ValueError):
+            x_rel = 0
+
+        word_sx = te.winfo_rootx() + x_rel
+        word_sy = te.winfo_rooty()
+        te_h    = te.winfo_height()
+
+        popup = tk.Toplevel(self.root)
+        popup.overrideredirect(True)
+        popup.configure(bd=1, relief='solid', bg='#fffbe6')
+        self._spell_popup = popup
+
+        frame = tk.Frame(popup, bg='#fffbe6', padx=8, pady=6)
+        frame.pack(fill='both', expand=True)
+
+        tk.Label(
+            frame, text=f'"{word}"',
+            font=('Helvetica', 10, 'bold'), bg='#fffbe6', fg='#c00',
+        ).pack(anchor='w')
+
+        row = self._row_of(te)
+
+        if suggestions:
+            tk.Label(
+                frame, text='Suggestions:',
+                font=('Helvetica', 9), bg='#fffbe6', fg='#555',
+            ).pack(anchor='w', pady=(2, 0))
+            for sug in suggestions[:8]:
+                def _apply(s=sug, r=row, st=start, en=end):
+                    self._spell_close_popup(warp_to_safety=False)
+                    self._insert_word(s, r, st, en)
+                    if self._spell_var.get() and r is not None and r < len(self.lines):
+                        self._spell_scan_row(self.lines[r][0])
+                        self._spell_draw_underlines(self.lines[r][0])
+                tk.Button(
+                    frame, text=sug, anchor='w', relief='flat',
+                    bg='#fffbe6', activebackground='#ddeeff',
+                    font=('Helvetica', 10), command=_apply, padx=4,
+                ).pack(fill='x', pady=1)
+        else:
+            tk.Label(frame, text='No suggestions.', bg='#fffbe6', fg='gray').pack(anchor='w')
+
+        popup.update_idletasks()
+        pw = popup.winfo_reqwidth()
+        ph = popup.winfo_reqheight()
+        sw = self.root.winfo_screenwidth()
+        sh = self.root.winfo_screenheight()
+        px = max(10, min(word_sx, sw - pw - 10))
+        py = word_sy + te_h + 4
+        if py + ph > sh - 10:
+            py = word_sy - ph - 4
+        popup.geometry(f'{pw}x{ph}+{px}+{py}')
+        popup.lift()
+        popup.update()   # commit geometry so the window is mapped before warp
+
+        def _on_leave(event):
+            try:
+                under = self.root.winfo_containing(event.x_root, event.y_root)
+            except tk.TclError:
+                under = None
+            if under is not None:
+                w = under
+                while w is not None:
+                    if str(w) == str(popup):
+                        return
+                    try:
+                        w = w.master
+                    except AttributeError:
+                        break
+            self._spell_close_popup(warp_to_safety=True, hover_te=te)
+
+        def _warp_and_arm():
+            if self._spell_popup is not popup:
+                return
+            # Warp cursor into popup center (popup-local coordinates)
+            try:
+                popup.event_generate('<Motion>', warp=True, x=pw // 2, y=ph // 2)
+            except tk.TclError:
+                pass
+            # Arm <Leave> after the warp has settled
+            popup.after(150, lambda: popup.bind('<Leave>', _on_leave) if self._spell_popup is popup else None)
+
+        # Small delay so the window is fully visible on-screen before warping
+        popup.after(50, _warp_and_arm)
+
+    def _spell_close_popup(self, warp_to_safety=False, hover_te=None):
+        if self._spell_after_id:
+            self.root.after_cancel(self._spell_after_id)
+            self._spell_after_id = None
+        if self._spell_popup:
+            try:
+                self._spell_popup.destroy()
+            except tk.TclError:
+                pass
+            self._spell_popup = None
+        self._spell_hover_te = None
+        self._spell_hover_span = None
+        if warp_to_safety and hover_te is not None:
+            try:
+                row    = self._row_of(hover_te)
+                target = max(0, (row or 0) - 2)
+                tgt_te = self.lines[target][0] if target < len(self.lines) else hover_te
+                tgt_te.event_generate(
+                    '<Motion>', warp=True,
+                    x=tgt_te.winfo_width() // 2,
+                    y=tgt_te.winfo_height() // 2,
+                )
+            except Exception:
+                pass
 
     def _about_click(self):
         popup = tk.Toplevel(self.root)
@@ -1291,10 +1503,13 @@ class Editor:
             relief="raised", padx=8, pady=2,
         ).pack(side="left", padx=(0, 6), pady=3)
 
-        tk.Button(
-            tb, text="Spell", command=self._spell_click,
-            relief="raised", padx=8, pady=2,
-        ).pack(side="left", padx=(0, 6), pady=3)
+        self._spell_btn = tk.Checkbutton(
+            tb, text="Spell",
+            variable=self._spell_var,
+            command=self._toggle_spell,
+            indicatoron=False, relief="raised", padx=8, pady=2,
+        )
+        self._spell_btn.pack(side="left", padx=(0, 6), pady=3)
 
         # Spacer to push right-side buttons
         tk.Frame(tb).pack(side="left", fill="x", expand=True)
@@ -1424,11 +1639,11 @@ class Editor:
             return
         start = min(self._sel_anchor, self._sel_focus)
         end   = max(self._sel_anchor, self._sel_focus)
+        self._sel_anchor = None
+        self._sel_focus  = None
         for i in range(start, end + 1):
             if i < len(self.lines):
                 self.lines[i][0].configure(bg="white")
-        self._sel_anchor = None
-        self._sel_focus  = None
         self.root.update_idletasks()
 
     def _update_row_selection(self, anchor, focus):
@@ -1531,6 +1746,10 @@ class Editor:
         self.lines.append((te, me))
         if text:
             self._update_margin(row)
+        if self._spell_var.get():
+            self._spell_scan_row(te)
+            self._spell_create_underline(te)
+            te.bind('<Motion>', lambda e, t=te: self._spell_on_motion(t, e))
 
     def _insert_row(self, row, text=""):
         """Insert a new line at the specified row index."""
@@ -1623,6 +1842,11 @@ class Editor:
         self._bind_row(te, "<Shift-Down>", self._shift_down)
         self._bind_row(te, "<Button-1>",   self._on_click)
 
+        if self._spell_var.get():
+            self._spell_scan_row(te)
+            self._spell_create_underline(te)
+            te.bind('<Motion>', lambda e, t=te: self._spell_on_motion(t, e))
+
     def _on_key(self, row):
         self._mark_dirty()
         self._update_margin(row)
@@ -1630,6 +1854,10 @@ class Editor:
         if self._meter_var.get() and row < len(self._meter_rows):
             text = self.lines[row][0].get()
             self._fill_meter_widget(self._meter_rows[row], text)
+        if self._spell_var.get() and row < len(self.lines):
+            te = self.lines[row][0]
+            self._spell_scan_row(te)
+            self._spell_draw_underlines(te)
 
     def _populate(self, n):
         for _ in range(n):
@@ -1691,6 +1919,9 @@ class Editor:
         self._click_index = te.index(tk.INSERT)
         # Clear any existing row selection on new click.
         self._clear_row_selection()
+        # Close spell popup so the user can edit manually.
+        if self._spell_popup is not None:
+            self._spell_close_popup(warp_to_safety=False)
 
     def _on_drag(self, event):
         try:
@@ -1734,6 +1965,8 @@ class Editor:
         if row >= len(self.lines):
             return
         te, me = self.lines.pop(row)
+        self._spell_errors.pop(te, None)
+        self._spell_destroy_underline(te)
         te.destroy()
         me.destroy()
         if row < len(self._rhyme_cells):
@@ -1933,6 +2166,8 @@ class Editor:
         while len(self.lines) > target:
             row = len(self.lines) - 1
             te, me = self.lines.pop()
+            self._spell_errors.pop(te, None)
+            self._spell_destroy_underline(te)
             te.destroy()
             me.destroy()
             if row < len(self._rhyme_cells):
