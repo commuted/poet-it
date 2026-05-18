@@ -135,8 +135,10 @@ class Linguistics:
         self._cmu        = _load_cmudict()
         self._syl_tok    = SyllableTokenizer()
         self._rhyme_dict = self._load_rhyme_dict()
+        self._thesaurus_lock     = threading.Lock()
         self._thesaurus          = None
         self._thesaurus_loading  = False
+        self._stanza_lock        = threading.Lock()
         self._stanza_nlp         = None
         self._stanza_loading     = False
 
@@ -191,9 +193,12 @@ class Linguistics:
         content = _read_data('rdict.js')
         if not content:
             return {}
-        start = content.index('var rhdict = ') + len('var rhdict = ')
-        end   = content.index('\nvar spdict = ')
-        return json.loads(content[start:end].rstrip(';\n '))
+        try:
+            start = content.index('var rhdict = ') + len('var rhdict = ')
+            end   = content.index('\nvar spdict = ')
+            return json.loads(content[start:end].rstrip(';\n '))
+        except (ValueError, json.JSONDecodeError):
+            return {}
 
     def _rhyme_suffix(self, word):
         entry = self._best_cmu_entry(word)
@@ -244,7 +249,12 @@ class Linguistics:
                         letter = anchor_letter
                         break
             if letter is None:
-                letter = chr(ord('A') + next_idx) if next_idx < 26 else chr(ord('a') + next_idx - 26)
+                if next_idx < 26:
+                    letter = chr(ord('A') + next_idx)
+                elif next_idx < 52:
+                    letter = chr(ord('a') + next_idx - 26)
+                else:
+                    letter = '?'
                 next_idx += 1
                 if suffix:
                     anchors.append((suffix, letter))
@@ -256,14 +266,16 @@ class Linguistics:
     # ------------------------------------------------------------------ #
 
     def _load_thesaurus_background(self):
-        if self._thesaurus is not None or self._thesaurus_loading:
-            return
-        self._thesaurus_loading = True
+        with self._thesaurus_lock:
+            if self._thesaurus is not None or self._thesaurus_loading:
+                return
+            self._thesaurus_loading = True
         try:
-            self._thesaurus = self._load_thesaurus()
+            result = self._load_thesaurus()
         except Exception:
-            self._thesaurus = {}
-        finally:
+            result = {}
+        with self._thesaurus_lock:
+            self._thesaurus = result
             self._thesaurus_loading = False
 
     def _load_thesaurus(self):
@@ -278,10 +290,26 @@ class Linguistics:
         return json.loads(raw)
 
     def get_thesaurus(self, word):
-        if self._thesaurus is None and not self._thesaurus_loading:
-            self._thesaurus = self._load_thesaurus()
+        with self._thesaurus_lock:
+            thesaurus = self._thesaurus
+            if thesaurus is None and not self._thesaurus_loading:
+                self._thesaurus_loading = True
+                do_load = True
+            else:
+                do_load = False
+        if do_load:
+            try:
+                result = self._load_thesaurus()
+            except Exception:
+                result = {}
+            with self._thesaurus_lock:
+                self._thesaurus = result
+                self._thesaurus_loading = False
+            thesaurus = result
+        if not thesaurus:
+            return []
         key  = word.lower()
-        syns = (self._thesaurus or {}).get(key, [])
+        syns = thesaurus.get(key, [])
         seen, result = {key}, []
         for s in syns:
             sl = s.lower()
@@ -296,36 +324,60 @@ class Linguistics:
 
     _STANZA_PROCESSORS = 'tokenize,mwt,pos,lemma,depparse'
 
+    @property
+    def stanza_ready(self):
+        with self._stanza_lock:
+            return self._stanza_nlp is not None
+
+    @property
+    def stanza_loading(self):
+        with self._stanza_lock:
+            return self._stanza_loading
+
     def _load_stanza_background(self):
-        if not STANZA_AVAILABLE or self._stanza_nlp is not None or self._stanza_loading:
-            return
-        self._stanza_loading = True
+        with self._stanza_lock:
+            if not STANZA_AVAILABLE or self._stanza_nlp is not None or self._stanza_loading:
+                return
+            self._stanza_loading = True
         try:
-            self._stanza_nlp = _stanza.Pipeline(
+            result = _stanza.Pipeline(
                 'en',
                 processors=self._STANZA_PROCESSORS,
                 verbose=False,
             )
         except Exception:
-            pass
-        finally:
+            result = None
+        with self._stanza_lock:
+            if result is not None:
+                self._stanza_nlp = result
             self._stanza_loading = False
 
     def get_stanza_doc(self, text):
         if not STANZA_AVAILABLE:
             return None
-        if self._stanza_nlp is None:
-            if self._stanza_loading:
-                return None
+        with self._stanza_lock:
+            nlp = self._stanza_nlp
+            if nlp is None and not self._stanza_loading:
+                self._stanza_loading = True
+                do_load = True
+            else:
+                do_load = False
+        if do_load:
             try:
-                self._stanza_nlp = _stanza.Pipeline(
+                result = _stanza.Pipeline(
                     'en',
                     processors=self._STANZA_PROCESSORS,
                     verbose=False,
                 )
             except Exception:
-                return None
-        return self._stanza_nlp(text)
+                result = None
+            with self._stanza_lock:
+                self._stanza_nlp = result
+                self._stanza_loading = False
+            nlp = result
+        if nlp is None:
+            return None
+        return nlp(text)
 
     # ------------------------------------------------------------------ #
     # Meter analysis
@@ -386,14 +438,17 @@ class Linguistics:
             return []
         doc = self.get_stanza_doc(text)
         if doc is not None:
-            result = [
+            stanza_words = [
                 (w.text, w.xpos or 'NN', w.deprel or '')
                 for sent in doc.sentences
                 for w in sent.words
                 if w.text.isalpha()
             ]
-            if result:
-                return result
+            # Only use Stanza tags when the alpha-token count matches what the
+            # regex produces; contractions and MWT can cause a mismatch that
+            # would misalign every subsequent tag in the line.
+            if len(stanza_words) == len(word_tokens):
+                return stanza_words
         try:
             tagged = nltk.pos_tag(word_tokens)
         except Exception:

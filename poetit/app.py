@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 import threading
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -46,22 +47,26 @@ class _MeterWorker(threading.Thread):
 
     Marshals UI updates back to the main thread via `root.after(0, …)`
     so the editor stays responsive while meter rows fill in.
+    Each worker carries a generation token; callbacks silently drop
+    if the generation has been superseded before they fire.
     """
-    def __init__(self, editor):
+    def __init__(self, editor, gen):
         super().__init__(daemon=True)
-        self._ed = editor
+        self._ed  = editor
+        self._gen = gen
 
     def run(self):
-        ed = self._ed
+        ed  = self._ed
+        gen = self._gen
         # Capture a snapshot of lines so late additions don't confuse indices.
         lines = list(ed.lines)
         for i, (te, _) in enumerate(lines):
             text = te.get()
-            # _compose_meter_line touches NLTK/CMU/spaCy but not the UI.
+            # _compose_meter_line touches NLTK/CMU/Stanza but not the UI.
             meter_text = ed._nlp.compose_meter_line(text) if text else ''
             # Schedule the UI update on the main thread.
-            ed.root.after(0, lambda idx=i, txt=meter_text: ed._update_meter_line(idx, txt))
-        ed.root.after(0, ed._meter_done)
+            ed.root.after(0, lambda idx=i, txt=meter_text: ed._update_meter_line(idx, txt, gen))
+        ed.root.after(0, lambda: ed._meter_done(gen))
 
 
 class Editor:
@@ -90,7 +95,9 @@ class Editor:
         self._size_var  = tk.IntVar(value=DEFAULT_SIZE)
         self._tk_font   = tkfont.Font(family=DEFAULT_FONT, size=DEFAULT_SIZE)
         self._char_w    = self._tk_font.measure("0")
-        self._meter_var = tk.BooleanVar(value=False)
+        self._meter_var     = tk.BooleanVar(value=False)
+        self._meter_loading = False
+        self._meter_gen     = 0
 
         sys_fonts = set(tkfont.families())
         self._avail_fonts = [f for f in _FONT_CANDIDATES if f in sys_fonts]
@@ -274,8 +281,14 @@ class Editor:
             except Exception:
                 pass
         state["last_repo"] = repo_path
-        with open(_STATE_FILE, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2)
+        fd, tmp = tempfile.mkstemp(dir=_STATE_DIR, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=2)
+            os.replace(tmp, _STATE_FILE)
+        except Exception:
+            os.unlink(tmp)
+            raise
 
     def _prompt_repo_setup(self):
         """Startup dialog to guide new users into creating a repository."""
@@ -460,24 +473,27 @@ class Editor:
 
         repo = Repo(repo_path)
         try:
-            head = repo.head()
-            tree = repo[repo[head].tree]
-        except Exception:
-            head = None
-            tree = None
+            try:
+                head = repo.head()
+                tree = repo[repo[head].tree]
+            except Exception:
+                head = None
+                tree = None
 
-        files = []
-        if tree is not None:
-            for entry in tree.items():
-                if entry.path.endswith(b".txt") and not entry.path.endswith(b".meta"):
-                    obj = repo[entry.sha]
-                    if isinstance(obj, Blob):
-                        files.append({
-                            "name": os.path.basename(entry.path.decode()),
-                            "path": entry.path.decode(),
-                            "sha": entry.sha.hex(),
-                            "mtime": 0,
-                        })
+            files = []
+            if tree is not None:
+                for entry in tree.items():
+                    if entry.path.endswith(b".txt") and not entry.path.endswith(b".meta"):
+                        obj = repo[entry.sha]
+                        if isinstance(obj, Blob):
+                            files.append({
+                                "name": os.path.basename(entry.path.decode()),
+                                "path": entry.path.decode(),
+                                "sha": entry.sha.hex(),
+                                "mtime": 0,
+                            })
+        finally:
+            repo.close()
 
         # Sort control
         sort_mode = tk.StringVar(value="alpha")
@@ -643,7 +659,8 @@ class Editor:
                 has_changes = bool(s.get('add') or s.get('delete') or s.get('modify') or st.unstaged)
             except Exception:
                 has_changes = True  # if status check fails, assume changed
-            repo.close()
+            finally:
+                repo.close()
 
             if not has_changes:
                 return False  # nothing to commit
@@ -1079,12 +1096,16 @@ class Editor:
                 "resvg_py and Pillow are required for the diagram.\nRun: pip install resvg_py Pillow"
             )
             return
+        if self._nlp.stanza_loading:
+            # Model is loading on startup — retry automatically once ready.
+            self.root.after(500, self._diagram_click)
+            return
         doc = self._nlp.get_stanza_doc(text)
         if doc is None:
             messagebox.showerror(
                 "Diagram",
-                "Stanza model not ready yet — still loading, or download failed.\n"
-                "Try again in a moment."
+                "Stanza model failed to load.\n"
+                "Check your internet connection and restart the application."
             )
             return
         popups.show_diagram_popup(
@@ -1157,25 +1178,28 @@ class Editor:
         for i, (te, _) in enumerate(self.lines):
             te.grid_remove()
             self._meter_rows[i].grid(row=i, column=0, sticky="ew")
-        # Phase 2 (background): compute meter strings per line and populate.
-        if getattr(self, '_meter_loading', False):
-            return  # worker already running
+        # Phase 2 (background): bump the generation to invalidate any running
+        # worker's pending callbacks, then start a fresh worker for the
+        # current line content.
+        self._meter_gen += 1
         self._meter_loading = True
-        self._meter_worker = _MeterWorker(self)
+        self._meter_worker = _MeterWorker(self, self._meter_gen)
         self._meter_worker.start()
 
-    def _update_meter_line(self, index, meter_text):
+    def _update_meter_line(self, index, meter_text, gen):
         """Called by _MeterWorker from the main thread via after()."""
-        if not self._meter_loading:
+        if not self._meter_loading or gen != self._meter_gen:
             return
         if index < len(self._meter_rows) and index < len(self.lines):
             self._fill_meter_widget(self._meter_rows[index], meter_text or '')
 
-    def _meter_done(self):
-        self._meter_loading = False
+    def _meter_done(self, gen):
+        if gen == self._meter_gen:
+            self._meter_loading = False
 
     def _hide_meter(self):
-        # If background computation is running, stop updating.
+        # Bump the generation to invalidate any running worker's pending callbacks.
+        self._meter_gen += 1
         self._meter_loading = False
         for i, (te, _) in enumerate(self.lines):
             if i < len(self._meter_rows):
@@ -1911,7 +1935,8 @@ class Editor:
         fsize = meta.get("size", DEFAULT_SIZE)
         if fname in self._avail_fonts:
             self._font_var.set(fname)
-        self._size_var.set(fsize)
+        if isinstance(fsize, int) and fsize in SIZES:
+            self._size_var.set(fsize)
         for i, runs in enumerate(meta.get("lines", [])):
             if i < len(self._line_meta):
                 self._line_meta[i] = runs
