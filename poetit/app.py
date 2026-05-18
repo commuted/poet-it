@@ -1225,8 +1225,39 @@ class Editor:
     # Rhyme UI
     # ------------------------------------------------------------------ #
 
+    def _ensure_row_visible(self, row):
+        """Scroll the canvas so the entry at `row` stays within the visible area."""
+        if row < 0 or row >= len(self.lines):
+            return
+        self.canvas.update_idletasks()
+        canvas_h  = self.canvas.winfo_height()
+        content_h = self.inner.winfo_height()
+        if content_h <= canvas_h:
+            return  # all content fits — no scrolling needed
+
+        # Use the meter widget when it is the visible representative for this row.
+        if self._meter_var.get() and row < len(self._meter_rows):
+            ref = self._meter_rows[row]
+        else:
+            ref = self.lines[row][0]
+
+        row_y = ref.winfo_y()
+        row_h = ref.winfo_height()
+
+        cv_top, cv_bot = self.canvas.yview()
+        vis_top = cv_top * content_h
+        vis_bot = cv_bot * content_h
+
+        if row_y + row_h > vis_bot:
+            # Row bottom is below the viewport — scroll up so it becomes visible.
+            self.canvas.yview_moveto(max(0.0, (row_y + row_h - canvas_h) / content_h))
+        elif row_y < vis_top:
+            # Row top is above the viewport — scroll down so it becomes visible.
+            self.canvas.yview_moveto(max(0.0, row_y / content_h))
+
     def _on_focus_in(self, row):
         self._last_focus_row = row
+        self._ensure_row_visible(row)
 
     def _on_focus_out(self, row):
         if row < len(self.lines):
