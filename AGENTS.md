@@ -55,11 +55,11 @@ There is no single `tk.Text` widget; the document is the concatenation of all ro
 - `prosodic` — preferred meter analysis backend
 - `spacy` + `en_core_web_md` — dependency diagrams and better function-word detection
 - `cairosvg` + `Pillow` — rendering dependency diagrams as PNG
-- Thesaurus data (`th_en_US_new.js`) — synonym lookup
+- Thesaurus data (`th_en_US_new.json`) — synonym lookup
 
 **Meter display:** Stress is shown by letter case in the meter row: UPPERCASE = primary stress, Capitalized = secondary stress, lowercase = unstressed.
 
-**Data files:** `poedit/data/` contains symlinks to `rdict.js` (rhyme dictionary) and `th_en_US_new.js` (thesaurus). The package version resolves these via `importlib.resources`; the standalone version falls back to `../rhyming-dictionary/rdict.js` and `../node_modules/thesaurus/lib/th_en_US_new.js`.
+**Data files:** `poedit/data/` contains symlinks to `rdict.json` (rhyme dictionary) and `th_en_US_new.json` (thesaurus). The package version resolves these via `importlib.resources`; the standalone version falls back to `../rhyming-dictionary/rdict.json` and `../node_modules/thesaurus/lib/th_en_US_new.json`.
 
 ## Build
 

@@ -197,7 +197,7 @@ class Linguistics:
     # ------------------------------------------------------------------ #
 
     def _load_rhyme_dict(self):
-        content = _read_data('rdict.js')
+        content = _read_data('rdict.json')
         if not content:
             return {}
         try:
@@ -286,7 +286,7 @@ class Linguistics:
             self._thesaurus_loading = False
 
     def _load_thesaurus(self):
-        raw = _read_data('th_en_US_new.js')
+        raw = _read_data('th_en_US_new.json')
         if not raw:
             return {}
         raw = raw.strip()

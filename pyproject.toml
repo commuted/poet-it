@@ -62,7 +62,7 @@ include = ["poetit", "poetit.*"]
 
 [tool.setuptools.package-data]
 "poetit" = [
-    "data/*.js",
+    "data/*.json",
     "data/*.dict",
     "data/*.png",
     "data/*.desktop",

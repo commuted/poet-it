@@ -28,13 +28,13 @@ pyspellchecker
   License: MIT License
   https://github.com/barrust/pyspellchecker
 
-Rhyming dictionary data (rdict.js)
+Rhyming dictionary data (rdict.json)
   Copyright (c) Ron Hinchley
   License: Apache License 2.0
   https://github.com/commuted/rhyming-dictionary
   An adaptation of the CMU Pronouncing Dictionary.
 
-Thesaurus data (th_en_US_new.js)
+Thesaurus data (th_en_US_new.json)
   Derived from WordNet 2.0
   Copyright (c) 2003 by Princeton University. All rights reserved.
   License: WordNet License (BSD-style)
