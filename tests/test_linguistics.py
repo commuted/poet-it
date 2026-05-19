@@ -203,3 +203,53 @@ class TestSyllabifyWord:
         word = "beautiful"
         result = nlp._syllabify_word(word)
         assert "".join(chunk for chunk, _ in result) == word
+
+
+# ── check_spelling ────────────────────────────────────────────────────────────
+
+class TestCheckSpelling:
+    def test_correct_word_returns_true_no_suggestions(self, nlp):
+        ok, suggestions = nlp.check_spelling("hello")
+        assert ok is True
+        assert suggestions == []
+
+    def test_misspelled_word_returns_false(self, nlp):
+        ok, _ = nlp.check_spelling("speling")
+        assert ok is False
+
+    def test_misspelled_word_has_suggestions(self, nlp):
+        _, suggestions = nlp.check_spelling("speling")
+        assert len(suggestions) > 0
+
+    def test_suggestions_are_strings(self, nlp):
+        _, suggestions = nlp.check_spelling("speling")
+        assert all(isinstance(s, str) for s in suggestions)
+
+    def test_misspelled_word_not_in_own_suggestions(self, nlp):
+        _, suggestions = nlp.check_spelling("speling")
+        assert "speling" not in suggestions
+
+    def test_correct_suggestion_present(self, nlp):
+        _, suggestions = nlp.check_spelling("speling")
+        assert "spelling" in suggestions
+
+    def test_case_insensitive_correct(self, nlp):
+        ok_lower, _ = nlp.check_spelling("hello")
+        ok_upper, _ = nlp.check_spelling("Hello")
+        assert ok_lower is True
+        assert ok_upper is True
+
+    def test_case_insensitive_incorrect(self, nlp):
+        ok_lower, _ = nlp.check_spelling("speling")
+        ok_upper, _ = nlp.check_spelling("SPELING")
+        assert ok_lower is False
+        assert ok_upper is False
+
+    def test_another_correct_word(self, nlp):
+        ok, _ = nlp.check_spelling("poetry")
+        assert ok is True
+
+    def test_another_misspelled_word(self, nlp):
+        ok, suggestions = nlp.check_spelling("potery")
+        assert ok is False
+        assert len(suggestions) > 0
