@@ -28,6 +28,15 @@ MARGIN_CHARS = 2
 INITIAL_LINES = 50
 DEFAULT_FONT  = "Courier"
 DEFAULT_SIZE  = 12
+
+
+def _default_poems_dir() -> str:
+    """Return ~/Documents/Poetit, creating it if absent."""
+    d = os.path.join(os.path.expanduser("~"), "Documents", "Poetit")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
 SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72]
 _FONT_CANDIDATES = [
     "Courier", "Courier New", "Courier 10 Pitch",
@@ -691,7 +700,7 @@ class Editor:
         last_repo = self._load_repo_state()
         repo_path = filedialog.askdirectory(
             title="Select Repository",
-            initialdir=last_repo or os.path.expanduser("~"),
+            initialdir=last_repo or os.path.join(os.path.expanduser("~"), "Documents"),
         )
         if not repo_path:
             return
@@ -2285,6 +2294,7 @@ class Editor:
                     path = filedialog.asksaveasfilename(
                         defaultextension=".txt",
                         filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+                        initialdir=_default_poems_dir(),
                     )
                     if not path:
                         return False    # user cancelled the Save As dialog
@@ -2385,7 +2395,8 @@ class Editor:
             return
         # Otherwise check if user wants to configure version control
         path = filedialog.askopenfilename(
-            filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")]
+            filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+            initialdir=_default_poems_dir(),
         )
         if path:
             self._load_file(path)
@@ -2405,6 +2416,7 @@ class Editor:
             path = filedialog.asksaveasfilename(
                 defaultextension=".txt",
                 filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+                initialdir=_default_poems_dir(),
             )
             if path:
                 self._write_files(path)
@@ -2467,6 +2479,7 @@ class Editor:
             path = filedialog.asksaveasfilename(
                 defaultextension=".txt",
                 filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+                initialdir=_default_poems_dir(),
             )
             if path:
                 self._write_files(path)
@@ -2482,6 +2495,7 @@ class Editor:
         path = filedialog.askopenfilename(
             title="Import Poem File",
             filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+            initialdir=_default_poems_dir(),
         )
         if not path:
             return

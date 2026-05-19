@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.commuted.Poetit</id>
+  <name>Poetit</name>
+  <summary>Poetry editor with meter, rhyme, thesaurus, and version control</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+
+  <description>
+    <p>
+      Poetit is a line-by-line poetry editor built with Python and tkinter.
+      It counts syllables, marks stress patterns, detects rhyme schemes,
+      provides thesaurus lookup, and tracks poem history with Git.
+    </p>
+    <ul>
+      <li>Syllable counts via bundled CMU Pronouncing Dictionary</li>
+      <li>Stress-marked meter display</li>
+      <li>Rhyme scheme detection and word-level rhyme lookup</li>
+      <li>Thesaurus and WordNet definitions (bundled, no internet required)</li>
+      <li>Dependency-parse diagrams via Stanza (Stanford NLP)</li>
+      <li>Git-based version control with commit history browser</li>
+      <li>Spell check with inline suggestions</li>
+    </ul>
+  </description>
+
+  <url type="homepage">https://github.com/commuted/poetit</url>
+  <url type="bugtracker">https://github.com/commuted/poetit/issues</url>
+
+  <provides>
+    <binary>poetit</binary>
+  </provides>
+
+  <releases>
+    <release version="0.1.0" date="2026-05-18"/>
+  </releases>
+
+  <content_rating type="oars-1.1"/>
+</component>

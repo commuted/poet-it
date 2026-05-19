@@ -1,4 +1,4 @@
-Poedit
+Poetit
 
 A poetry editor with meter analysis, rhyme detection, and linguistic tools.
 
@@ -8,6 +8,26 @@ Features:
   - Rhyme scheme detection and lookup
   - Word definitions and dependency diagrams
   - Thesaurus integration
+  - Spell check with inline suggestions
+
+Libraries:
+  Stanza — Stanford NLP Group
+    Sentence parsing and dependency diagrams
+    Copyright (c) 2019 The Board of Trustees of
+    The Leland Stanford Junior University
+    License: Apache License 2.0
+    https://stanfordnlp.github.io/stanza/
+
+Data:
+  Rhyming dictionary (rdict.js)
+    Ron Hinchley's adaptation of the CMU Pronouncing Dictionary
+    License: Apache License 2.0
+    https://github.com/commuted/rhyming-dictionary
+
+  Thesaurus (th_en_US_new.js)
+    Derived from WordNet 2.0 — Princeton University
+    License: WordNet License (BSD-style)
+    https://wordnet.princeton.edu/license-and-commercial-use
 
 Support:
   Scan the QR code below or visit the project repository for issues,

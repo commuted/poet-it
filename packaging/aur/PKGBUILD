@@ -1,0 +1,41 @@
+# Maintainer: Ron Hinchley <commuted@gmail.com>
+pkgname=poetit
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Desktop poetry editor with meter analysis, rhyme lookup, thesaurus, and version control"
+arch=('any')
+url="https://github.com/commuted/poetit"
+license=('MIT')
+depends=(
+    'python>=3.10'
+    'tk'
+    'python-nltk'
+    'python-pillow'
+    'python-dulwich'
+    'python-pyspellchecker'
+)
+makedepends=(
+    'python-build'
+    'python-installer'
+    'python-wheel'
+    'python-setuptools'
+)
+optdepends=(
+    'python-stanza: dependency diagram support (downloads model on first run)'
+    'python-prosodic: enhanced meter analysis'
+    'resvg_py: SVG diagram rendering'
+)
+source=("$pkgname-$pkgver.tar.gz::https://github.com/commuted/$pkgname/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')   # replace with actual sha256 before AUR submission
+
+build() {
+    cd "$pkgname-$pkgver"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    python -m installer --destdir="$pkgdir" dist/*.whl
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 NOTICE  "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
+}

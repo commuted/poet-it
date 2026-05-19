@@ -5,6 +5,12 @@ and data. Their respective licenses and notices are reproduced below.
 
 ---
 
+Stanza (Stanford NLP)
+  Copyright (c) 2019 The Board of Trustees of The Leland Stanford Junior University
+  License: Apache License 2.0
+  https://stanfordnlp.github.io/stanza/
+  https://github.com/stanfordnlp/stanza
+
 NLTK (Natural Language Toolkit)
   License: Apache License 2.0
   https://www.nltk.org/
@@ -12,18 +18,6 @@ NLTK (Natural Language Toolkit)
 prosodic
   License: Apache License 2.0
   https://github.com/quadrismegistus/prosodic
-
-spaCy
-  License: MIT License
-  https://spacy.io/
-
-en_core_web_md (spaCy English pipeline)
-  License: MIT License
-  https://github.com/explosion/spacy-models
-
-CairoSVG
-  License: GNU Lesser General Public License v3.0 or later (LGPL-3.0-or-later)
-  https://cairosvg.org/
 
 Pillow (PIL Fork)
   License: HPND (Historical Permission Notice and Disclaimer) / MIT-CMU
@@ -35,15 +29,23 @@ pyspellchecker
   https://github.com/barrust/pyspellchecker
 
 Rhyming dictionary data (rdict.js)
-  Bundled data file from an external rhyming dictionary source.
+  Copyright (c) Ron Hinchley
+  License: Apache License 2.0
+  https://github.com/commuted/rhyming-dictionary
+  An adaptation of the CMU Pronouncing Dictionary.
 
 Thesaurus data (th_en_US_new.js)
-  Bundled data file from an external thesaurus source.
+  Derived from WordNet 2.0
+  Copyright (c) 2003 by Princeton University. All rights reserved.
+  License: WordNet License (BSD-style)
+  https://wordnet.princeton.edu/license-and-commercial-use
+  Distributed via the MyThes / LibreOffice dictionaries project:
+  https://github.com/LibreOffice/dictionaries
 
 ---
 
 For the full text of the Apache License 2.0, see:
   https://www.apache.org/licenses/LICENSE-2.0
 
-For the full text of the GNU LGPL v3.0, see:
-  https://www.gnu.org/licenses/lgpl-3.0.html
+For the full text of the WordNet License, see:
+  https://wordnet.princeton.edu/license-and-commercial-use

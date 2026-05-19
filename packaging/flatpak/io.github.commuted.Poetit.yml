@@ -1,0 +1,60 @@
+app-id: io.github.commuted.Poetit
+runtime: org.gnome.Platform
+runtime-version: '46'
+sdk: org.gnome.Sdk
+command: poetit
+
+finish-args:
+  # Display
+  - --socket=x11
+  - --socket=wayland
+  - --share=ipc
+  - --device=dri
+  # Poems directory — minimal filesystem grant
+  - --filesystem=~/Documents/Poetit:create
+  # Stanza downloads its English model on first run
+  - --share=network
+
+modules:
+  # ── Python dependencies ─────────────────────────────────────────────────
+  # flatpak-pip-generator can regenerate this list from requirements.txt:
+  #   flatpak-pip-generator --runtime org.gnome.Platform//46 \
+  #       nltk prosodic stanza pyspellchecker Pillow dulwich resvg_py
+  # The generated JSON files are then included here via:
+  #   - python3-nltk.json
+  #   - python3-prosodic.json
+  #   etc.
+  #
+  # For local testing without pre-generated JSON, build with:
+  #   flatpak-builder --allow-missing-sources --install build/ \
+  #       packaging/flatpak/io.github.commuted.Poetit.yml
+
+  - name: python3-deps
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=/app --no-build-isolation
+          nltk>=3.8
+          prosodic>=3.0
+          stanza>=1.7
+          pyspellchecker>=0.7
+          Pillow>=9.0
+          dulwich>=0.22
+          resvg_py>=0.3
+    sources:
+      - type: dir
+        path: ../..
+
+  # ── Poetit itself ────────────────────────────────────────────────────────
+  - name: poetit
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=/app --no-deps --no-build-isolation .
+      - install -Dm644 LICENSE /app/share/licenses/io.github.commuted.Poetit/LICENSE
+      - install -Dm644 NOTICE  /app/share/licenses/io.github.commuted.Poetit/NOTICE
+      - install -Dm644 packaging/flatpak/io.github.commuted.Poetit.desktop
+            /app/share/applications/io.github.commuted.Poetit.desktop
+      - install -Dm644 packaging/flatpak/io.github.commuted.Poetit.metainfo.xml
+            /app/share/metainfo/io.github.commuted.Poetit.metainfo.xml
+    sources:
+      - type: dir
+        path: ../..

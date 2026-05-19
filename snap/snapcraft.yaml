@@ -1,6 +1,6 @@
 name: poetit
 version: '0.1.0'
-summary: Desktop poetry editor with meter, rhyme, and version control
+summary: Desktop poetry editor with meter, rhyme, thesaurus, and version control
 description: |
   Poetit is a line-by-line poetry editor built with Python and tkinter.
 
@@ -9,12 +9,14 @@ description: |
     - Stress-marked meter display (prosodic or NLTK fallback)
     - Rhyme scheme detection and word-level rhyme lookup
     - Thesaurus and WordNet definitions (bundled)
-    - Dependency-parse diagrams via spaCy (optional)
+    - Dependency-parse diagrams via Stanza (Stanford NLP)
     - Git-based version control with commit history browser
+    - Spell check with inline suggestions
 
+  Poems are stored in ~/Documents/Poetit/.
   No Electron, no browser — pure Python desktop app.
 
-grade: devel        # change to 'stable' for a release
+grade: devel        # change to 'stable' before store submission
 confinement: strict
 base: core22
 
@@ -27,16 +29,7 @@ parts:
     stage-packages:
       - python3-tk
       - libpython3-stdlib
-      # Tk theme support
       - tk8.6-blt2.5
-
-  # spaCy English model — download at build time
-  # Remove this part if you do not want diagram support.
-  spacy-model:
-    plugin: nil
-    after: [poetit]
-    override-build: |
-      $SNAPCRAFT_PART_INSTALL/../poetit/bin/python -m spacy download en_core_web_md
 
 apps:
   poetit:
@@ -47,10 +40,18 @@ apps:
       TCL_LIBRARY: $SNAP/usr/share/tcltk/tcl8.6
       TK_LIBRARY:  $SNAP/usr/share/tcltk/tk8.6
     plugs:
-      - home
-      - network          # for NLTK fallback downloads
+      - personal-files
+      - network          # Stanza downloads its English model on first use
       - desktop
       - desktop-legacy
       - wayland
       - x11
       - opengl
+
+plugs:
+  personal-files:
+    interface: personal-files
+    read:
+      - $HOME/Documents/Poetit
+    write:
+      - $HOME/Documents/Poetit
