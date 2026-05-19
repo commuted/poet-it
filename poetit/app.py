@@ -521,7 +521,7 @@ class Editor:
                 qr_label.pack(pady=(0, 8))
 
                 tk.Label(
-                    popup, text="Scan for support & project info",
+                    popup, text="Buy me a Coffee",
                     font=("TkDefaultFont", 9), fg="gray",
                 ).pack(pady=(0, 8))
             except Exception:

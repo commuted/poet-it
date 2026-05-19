@@ -1,4 +1,5 @@
 Poetit
+Copyright 2026 Ron Hinchley — MIT License
 
 A poetry editor with meter analysis, rhyme detection, and linguistic tools.
 
@@ -29,8 +30,13 @@ Data:
     License: WordNet License (BSD-style)
     https://wordnet.princeton.edu/license-and-commercial-use
 
+Issues:
+  https://github.com/commuted/poetit/issues
+
+Source:
+  https://github.com/commuted/poetit
+
 Support:
-  Scan the QR code below or visit the project repository for issues,
-  bug reports, and feature requests.
+  Scan the QR code to buy me a coffee.
 
 Version 0.1.0
