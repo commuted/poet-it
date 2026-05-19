@@ -38,6 +38,22 @@ def _default_poems_dir() -> str:
 
 
 SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72]
+
+_DEFAULT_THEMES = {
+    "light": {
+        "Classic Light": {"bg": "white",   "fg": "black"},
+        "Warm Paper":    {"bg": "#fdf6e3", "fg": "#333333"},
+        "Cool Gray":     {"bg": "#f0f0f0", "fg": "#1a1a1a"},
+    },
+    "dark": {
+        "Classic Dark":  {"bg": "#1e1e1e", "fg": "#d4d4d4"},
+        "Night Blue":    {"bg": "#0d1117", "fg": "#c9d1d9"},
+        "Solarized":     {"bg": "#002b36", "fg": "#839496"},
+    },
+    "default_light": "Classic Light",
+    "default_dark":  "Classic Dark",
+    "active":        "Classic Light",
+}
 _FONT_CANDIDATES = [
     "Courier", "Courier New", "Courier 10 Pitch",
     "DejaVu Sans Mono", "FreeMono", "Liberation Mono",
@@ -121,8 +137,16 @@ class Editor:
         if not self._avail_fonts:
             self._avail_fonts = sorted(sys_fonts)[:40]
 
+        self._theme_data       = self._load_theme_state()
+        self._theme_bg         = "white"
+        self._theme_fg         = "black"
+        self._active_theme_var = tk.StringVar()
+        self._theme_light_menu = None
+        self._theme_dark_menu  = None
+
         self._build_ui()
         self._populate(INITIAL_LINES)
+        self._apply_theme(self._theme_data.get("active", "Classic Light"), save=False)
         init_w = (80 + MARGIN_CHARS) * self._char_w + 20
         self.root.geometry(f"{init_w}x600")
         self._update_title()
@@ -256,7 +280,7 @@ class Editor:
     def _spell_create_underline(self, te):
         if te in self._spell_underlines:
             return
-        uc = tk.Canvas(self.inner, height=2, bg='white', highlightthickness=0, bd=0)
+        uc = tk.Canvas(self.inner, height=2, bg=self._theme_bg, highlightthickness=0, bd=0)
         # Place the 2-px canvas at the very bottom of the entry, inside its own space.
         # anchor='sw' pins the canvas's bottom-left to (te.x, te.y + te.height).
         uc.place(in_=te, relx=0, rely=1.0, relwidth=1.0, height=2, anchor='sw')
@@ -1632,6 +1656,25 @@ class Editor:
                                       value=sz, command=self._apply_font)
         menu.add_cascade(label="Size", menu=size_menu)
 
+        self._theme_light_menu = tk.Menu(menu, tearoff=0)
+        self._theme_dark_menu  = tk.Menu(menu, tearoff=0)
+        theme_menu = tk.Menu(menu, tearoff=0)
+        theme_menu.add_cascade(label="Light", menu=self._theme_light_menu)
+        theme_menu.add_cascade(label="Dark",  menu=self._theme_dark_menu)
+        theme_menu.add_separator()
+        theme_menu.add_command(label="Edit Themes…", command=self._edit_themes_dialog)
+        menu.add_cascade(label="Theme", menu=theme_menu)
+        self._rebuild_theme_menus()
+
+        help_menu = tk.Menu(menu, tearoff=0)
+        help_menu.add_command(label="Long Help",    command=self._help_long)
+        help_menu.add_command(label="Concise Help", command=self._help_concise)
+        help_menu.add_command(label="Help PDF",     command=self._help_pdf)
+        help_menu.add_command(label="Support",      command=self._help_support)
+        menu.add_command(label="    ", state="disabled")
+        menu.add_command(label="    ", state="disabled")
+        menu.add_cascade(label="Help", menu=help_menu)
+
         self.root.config(menu=menu)
 
     def _on_canvas_resize(self, event):
@@ -1683,7 +1726,7 @@ class Editor:
         self._sel_focus  = None
         for i in range(start, end + 1):
             if i < len(self.lines):
-                self.lines[i][0].configure(bg="white")
+                self.lines[i][0].configure(bg=self._theme_bg)
         self.root.update_idletasks()
 
     def _update_row_selection(self, anchor, focus):
@@ -1699,7 +1742,7 @@ class Editor:
         if old_start is not None:
             for i in range(old_start, old_end + 1):
                 if i < len(self.lines) and not (new_start <= i <= new_end):
-                    self.lines[i][0].configure(bg="white")
+                    self.lines[i][0].configure(bg=self._theme_bg)
 
         # Highlight rows in the new selection.
         for i in range(new_start, new_end + 1):
@@ -1720,7 +1763,7 @@ class Editor:
 
         te = tk.Entry(
             self.inner, font=spec, relief="flat", bd=0,
-            bg="white", highlightthickness=0, insertbackground="black",
+            bg=self._theme_bg, highlightthickness=0, insertbackground=self._theme_fg,
         )
         me = tk.Entry(
             self.inner, font=spec, relief="flat", bd=0,
@@ -1801,7 +1844,7 @@ class Editor:
 
         te = tk.Entry(
             self.inner, font=spec, relief="flat", bd=0,
-            bg="white", highlightthickness=0, insertbackground="black",
+            bg=self._theme_bg, highlightthickness=0, insertbackground=self._theme_fg,
         )
         me = tk.Entry(
             self.inner, font=spec, relief="flat", bd=0,
@@ -2320,6 +2363,231 @@ class Editor:
         self._update_title()
         if self.lines:
             self.lines[0][0].focus_set()
+
+    # ------------------------------------------------------------------ #
+    # Help
+    # ------------------------------------------------------------------ #
+
+    def _help_long(self):
+        messagebox.showinfo("Long Help", "Long Help — not yet implemented.")
+
+    def _help_concise(self):
+        messagebox.showinfo("Concise Help", "Concise Help — not yet implemented.")
+
+    def _help_pdf(self):
+        messagebox.showinfo("Help PDF", "Help PDF — not yet implemented.")
+
+    def _help_support(self):
+        messagebox.showinfo("Support", "Support — not yet implemented.")
+
+    # ------------------------------------------------------------------ #
+    # Theme
+    # ------------------------------------------------------------------ #
+
+    def _load_theme_state(self):
+        data = {
+            "light":         {k: dict(v) for k, v in _DEFAULT_THEMES["light"].items()},
+            "dark":          {k: dict(v) for k, v in _DEFAULT_THEMES["dark"].items()},
+            "default_light": _DEFAULT_THEMES["default_light"],
+            "default_dark":  _DEFAULT_THEMES["default_dark"],
+            "active":        _DEFAULT_THEMES["active"],
+        }
+        if not os.path.exists(_STATE_FILE):
+            return data
+        try:
+            with open(_STATE_FILE, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            saved = state.get("themes", {})
+            for cat in ("light", "dark"):
+                data[cat].update({k: dict(v) for k, v in saved.get(cat, {}).items()})
+            for key in ("default_light", "default_dark", "active"):
+                if key in saved:
+                    data[key] = saved[key]
+        except Exception:
+            pass
+        return data
+
+    def _save_theme_state(self):
+        os.makedirs(_STATE_DIR, exist_ok=True)
+        state = {}
+        if os.path.exists(_STATE_FILE):
+            try:
+                with open(_STATE_FILE, "r", encoding="utf-8") as f:
+                    state = json.load(f)
+            except Exception:
+                pass
+        state["themes"] = self._theme_data
+        fd, tmp = tempfile.mkstemp(dir=_STATE_DIR, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=2)
+            os.replace(tmp, _STATE_FILE)
+        except Exception:
+            os.unlink(tmp)
+            raise
+
+    def _apply_theme(self, name, save=True):
+        theme = None
+        for cat in ("light", "dark"):
+            if name in self._theme_data.get(cat, {}):
+                theme = self._theme_data[cat][name]
+                break
+        if not theme:
+            return
+        bg, fg = theme["bg"], theme["fg"]
+        self._theme_bg = bg
+        self._theme_fg = fg
+        self._theme_data["active"] = name
+        self._active_theme_var.set(name)
+        self.canvas.configure(bg=bg)
+        self.inner.configure(bg=bg)
+        for te, _me in self.lines:
+            te.configure(bg=bg, fg=fg, insertbackground=fg)
+        for uc in self._spell_underlines.values():
+            uc.configure(bg=bg)
+        if save:
+            self._save_theme_state()
+        if self._theme_light_menu is not None:
+            self._rebuild_theme_menus()
+
+    def _rebuild_theme_menus(self):
+        self._theme_light_menu.delete(0, "end")
+        for name in self._theme_data.get("light", {}):
+            self._theme_light_menu.add_radiobutton(
+                label=name, variable=self._active_theme_var, value=name,
+                command=lambda n=name: self._apply_theme(n),
+            )
+        self._theme_dark_menu.delete(0, "end")
+        for name in self._theme_data.get("dark", {}):
+            self._theme_dark_menu.add_radiobutton(
+                label=name, variable=self._active_theme_var, value=name,
+                command=lambda n=name: self._apply_theme(n),
+            )
+
+    def _edit_themes_dialog(self):
+        popup = tk.Toplevel(self.root)
+        popup.title("Edit Themes")
+        popup.resizable(False, False)
+        popup.transient(self.root)
+        popup.grab_set()
+
+        content = tk.Frame(popup, padx=12, pady=10)
+        content.pack(fill="both", expand=True)
+
+        def make_panel(parent, category):
+            title = "Light Themes" if category == "light" else "Dark Themes"
+            frm = tk.LabelFrame(parent, text=title, padx=8, pady=6)
+            frm.pack(side="left", fill="both", expand=True,
+                     padx=(0, 8) if category == "light" else (0, 0))
+
+            lb_frame = tk.Frame(frm)
+            lb_frame.pack(fill="both", expand=True)
+            sb = tk.Scrollbar(lb_frame, orient="vertical")
+            lb = tk.Listbox(lb_frame, yscrollcommand=sb.set, selectmode="single",
+                            width=22, height=8, exportselection=False)
+            sb.config(command=lb.yview)
+            sb.pack(side="right", fill="y")
+            lb.pack(side="left", fill="both", expand=True)
+
+            om_var = tk.StringVar()
+            om = [None]   # mutable container so refresh_lb closure can rebind
+
+            def refresh_lb():
+                lb.delete(0, "end")
+                active = self._theme_data.get("active", "")
+                dflt   = self._theme_data.get(f"default_{category}", "")
+                for n in self._theme_data.get(category, {}):
+                    tag = (" ✓" if n == active else "") + (" (default)" if n == dflt else "")
+                    lb.insert("end", n + tag)
+                choices = list(self._theme_data.get(category, {}).keys())
+                om_var.set(self._theme_data.get(f"default_{category}", choices[0] if choices else ""))
+                if om[0] is not None:
+                    m = om[0]["menu"]
+                    m.delete(0, "end")
+                    for ch in choices:
+                        m.add_command(label=ch, command=lambda v=ch: _set_default(v))
+
+            def _set_default(name):
+                self._theme_data[f"default_{category}"] = name
+                self._save_theme_state()
+                refresh_lb()
+
+            choices = list(self._theme_data.get(category, {}).keys())
+            dflt_frame = tk.Frame(frm)
+            dflt_frame.pack(fill="x", pady=(6, 2))
+            tk.Label(dflt_frame, text="Default:").pack(side="left")
+            om_var.set(self._theme_data.get(f"default_{category}", choices[0] if choices else ""))
+            om[0] = tk.OptionMenu(dflt_frame, om_var, *(choices or [""]),
+                                  command=_set_default)
+            om[0].pack(side="left", padx=(4, 0))
+
+            lbl = "New Light Theme…" if category == "light" else "New Dark Theme…"
+            tk.Button(
+                frm, text=lbl,
+                command=lambda cat=category, rl=refresh_lb: self._new_theme_dialog(cat, popup, rl),
+            ).pack(pady=(6, 0))
+
+            refresh_lb()
+
+        make_panel(content, "light")
+        make_panel(content, "dark")
+
+        tk.Button(popup, text="Close", command=popup.destroy, padx=16).pack(pady=(0, 10))
+
+    def _new_theme_dialog(self, category, parent, refresh_cb):
+        from tkinter import colorchooser
+        label = "Light" if category == "light" else "Dark"
+        dia = tk.Toplevel(parent)
+        dia.title(f"New {label} Theme")
+        dia.resizable(False, False)
+        dia.transient(parent)
+        dia.grab_set()
+
+        pad = {"padx": 12, "pady": 4}
+        tk.Label(dia, text="Theme name:").grid(row=0, column=0, sticky="w", **pad)
+        name_var = tk.StringVar()
+        tk.Entry(dia, textvariable=name_var, width=24).grid(
+            row=0, column=1, columnspan=2, sticky="ew", **pad)
+
+        init_bg = "white"   if category == "light" else "#1e1e1e"
+        init_fg = "black"   if category == "light" else "#d4d4d4"
+        bg_var  = tk.StringVar(value=init_bg)
+        fg_var  = tk.StringVar(value=init_fg)
+
+        def make_color_row(row, row_label, color_var):
+            tk.Label(dia, text=row_label).grid(row=row, column=0, sticky="w", **pad)
+            swatch = tk.Label(dia, width=3, relief="sunken", bg=color_var.get())
+            swatch.grid(row=row, column=1, sticky="w", padx=(12, 4), pady=4)
+            def pick(cv=color_var, sw=swatch, lbl=row_label):
+                result = colorchooser.askcolor(color=cv.get(), parent=dia, title=lbl)
+                if result and result[1]:
+                    cv.set(result[1])
+                    sw.configure(bg=result[1])
+            tk.Button(dia, text="Pick…", command=pick).grid(
+                row=row, column=2, sticky="w", **pad)
+
+        make_color_row(1, "Background:", bg_var)
+        make_color_row(2, "Foreground:", fg_var)
+
+        def _add():
+            name = name_var.get().strip()
+            if not name:
+                messagebox.showwarning("Error", "Theme name is required.", parent=dia)
+                return
+            if name in self._theme_data.get(category, {}):
+                if not messagebox.askyesno(
+                        "Overwrite", f"'{name}' already exists. Overwrite?", parent=dia):
+                    return
+            self._theme_data[category][name] = {"bg": bg_var.get(), "fg": fg_var.get()}
+            self._save_theme_state()
+            self._rebuild_theme_menus()
+            refresh_cb()
+            dia.destroy()
+
+        btn_frame = tk.Frame(dia)
+        btn_frame.grid(row=3, column=0, columnspan=3, pady=(4, 12))
+        tk.Button(btn_frame, text="Add Theme", command=_add).pack(side="left", padx=8)
+        tk.Button(btn_frame, text="Cancel", command=dia.destroy).pack(side="left")
 
     def _quit(self):
         if self._confirm_discard():
