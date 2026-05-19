@@ -1,5 +1,5 @@
 Poetit
-Copyright 2026 Ron Hinchley — MIT License
+Copyright 2026 Ron Hinchley — MIT License, except where otherwise noted
 
 A poetry editor with meter analysis, rhyme detection, and linguistic tools.
 
