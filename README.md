@@ -1,6 +1,8 @@
 # Poetit
 
-A desktop poetry editor with built-in syllable counting, meter analysis, rhyme detection, thesaurus, dictionary, dependency diagrams, and git-based version control. Built with Python and tkinter — no Electron, no browser.
+A desktop poetry editor with built-in syllable counting, meter analysis, rhyme detection, thesaurus, dictionary, dependency diagrams, and git-based version control. Built with Python and tkinter — no Electron, no browser. 
+
+This is working now but python dependencies are 6G because of the NLP, Pytorch and unused CUDA. Working on shrinking it. 
 
 ---
 
