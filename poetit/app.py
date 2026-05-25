@@ -536,13 +536,12 @@ class Editor:
         popup.title("Set Up Repository")
         popup.transient(self.root)
         popup.resizable(False, False)
-        popup.grab_set()
 
         tk.Label(
             popup,
             text="Poetit keeps your poems under version control.\n\n"
                  f"Repository: {repo_dir}",
-            justify="left", padx=12, pady=(12, 8),
+            justify="left", padx=12, pady=12,
         ).pack(anchor="w")
 
         def _do_setup():
@@ -559,12 +558,14 @@ class Editor:
             popup.destroy()
 
         btn_frame = tk.Frame(popup)
-        btn_frame.pack(pady=(0, 12))
+        btn_frame.pack(pady=(4, 12))
         tk.Button(btn_frame, text="Set Up Repository", command=_do_setup, default="active").pack(
             side="left", padx=8
         )
         tk.Button(btn_frame, text="Skip for now", command=popup.destroy).pack(side="left", padx=8)
         popup.bind("<Return>", lambda e: _do_setup())
+        popup.update_idletasks()
+        popup.grab_set()
 
     def _open_repo(self):
         """Open the fixed repository and show its contents, creating it if needed."""
