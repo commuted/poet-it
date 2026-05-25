@@ -1348,13 +1348,20 @@ class Editor:
                 self.root.after(500, check_done)
                 return
             progress.destroy()
-            if result[0]:
-                self._diagram_click()
-            else:
+            if not result[0]:
                 messagebox.showerror(
                     "Download Failed",
                     "Failed to download the Stanza model.\n"
                     "Check your internet connection and try again."
+                )
+                return
+            if self._nlp.stanza_ready:
+                self._diagram_click()
+            else:
+                messagebox.showerror(
+                    "Diagram",
+                    "The model was downloaded but failed to load.\n"
+                    "Please restart the application."
                 )
 
         threading.Thread(target=do_download, daemon=True).start()
