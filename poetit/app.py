@@ -2554,14 +2554,17 @@ class Editor:
     def _open(self):
         if not self._confirm_discard():
             return
-        # If a repo is open, offer repo file selection first
-        if getattr(self, "_repo_path", None) and os.path.exists(self._repo_path):
-            self._show_repo_browser(self._repo_path)
+        repo_dir = _default_poems_dir()
+        try:
+            Repo(repo_dir).close()
+            self._repo_path = repo_dir
+            self._show_repo_browser(repo_dir)
             return
-        # Otherwise check if user wants to configure version control
+        except _dulwich_errors.NotGitRepository:
+            pass
         path = filedialog.askopenfilename(
             filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
-            initialdir=_default_poems_dir(),
+            initialdir=os.path.expanduser("~"),
         )
         if path:
             self._load_file(path)
