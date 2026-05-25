@@ -37,6 +37,48 @@ def _default_poems_dir() -> str:
     return d
 
 
+_DEMO_POEM_NAME = "Browning.txt"
+_DEMO_POEM = (
+    "Elizabeth Barrett Browning 1806 – 1861\n"
+    "\n"
+    "How do I love thee? Let me count the ways.\n"
+    "I love thee to the depth and breadth and height\n"
+    "My soul can reach, when feeling out of sight\n"
+    "For the ends of being and ideal grace.\n"
+    "I love thee to the level of every day’s\n"
+    "Most quiet need, by sun and candle-light.\n"
+    "I love thee freely, as men strive for right.\n"
+    "I love thee purely, as they turn from Praise.\n"
+    "I love thee with the passion put to use\n"
+    "In my old griefs, and with my childhood’s faith.\n"
+    "I love thee with a love I seemed to lose\n"
+    "With my lost saints. I love thee with the breath,\n"
+    "Smiles, tears, of all my life; and, if God choose,\n"
+    "I shall but love thee better after death.\n"
+)
+
+
+def _seed_demo_poem(repo_dir):
+    """Write Browning.txt into a newly created repo and make the first commit."""
+    if not _VCS_AVAILABLE:
+        return
+    dest = os.path.join(repo_dir, _DEMO_POEM_NAME)
+    if os.path.exists(dest):
+        return
+    try:
+        with open(dest, "w", encoding="utf-8") as f:
+            f.write(_DEMO_POEM)
+        _porcelain.add(repo_dir, paths=[_DEMO_POEM_NAME])
+        _porcelain.commit(
+            repo_dir,
+            message=b"Add demo poem: Sonnet 43 by Elizabeth Barrett Browning",
+            author=b"Poetit <poetit@local>",
+            committer=b"Poetit <poetit@local>",
+        )
+    except Exception:
+        pass
+
+
 SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72]
 
 _DEFAULT_THEMES = {
@@ -550,6 +592,7 @@ class Editor:
             except _dulwich_errors.NotGitRepository:
                 try:
                     Repo.init(repo_dir)
+                    _seed_demo_poem(repo_dir)
                 except Exception as exc:
                     messagebox.showerror("Error", f"Could not create repository:\n{exc}", parent=popup)
                     return
@@ -582,6 +625,7 @@ class Editor:
                 return
             try:
                 Repo.init(repo_dir)
+                _seed_demo_poem(repo_dir)
             except Exception as exc:
                 messagebox.showerror("Error", f"Could not create repository:\n{exc}")
                 return
@@ -2730,6 +2774,7 @@ class Editor:
             return False
         try:
             Repo.init(repo_dir)
+            _seed_demo_poem(repo_dir)
             self._repo_path = repo_dir
             return True
         except Exception as exc:
