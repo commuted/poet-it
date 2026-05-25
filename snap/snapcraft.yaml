@@ -53,5 +53,11 @@ plugs:
     interface: personal-files
     read:
       - $HOME/Documents/Poetit
+      - $HOME/.poetit
+      - $HOME/stanza_resources
+      - $HOME/nltk_data
     write:
       - $HOME/Documents/Poetit
+      - $HOME/.poetit
+      - $HOME/stanza_resources
+      - $HOME/nltk_data

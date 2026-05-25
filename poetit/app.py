@@ -152,17 +152,13 @@ class Editor:
         self._update_title()
         self.root.protocol("WM_DELETE_WINDOW", self._quit)
 
-        # Restore last-used repository from state
-        saved_repo = self._load_repo_state()
-        if saved_repo and os.path.exists(saved_repo):
+        if _VCS_AVAILABLE:
+            repo_dir = _default_poems_dir()
             try:
-                Repo(saved_repo)
-                self._repo_path = saved_repo
+                Repo(repo_dir).close()
+                self._repo_path = repo_dir
             except _dulwich_errors.NotGitRepository:
-                pass  # stale state entry, ignore
-
-        if _VCS_AVAILABLE and not self._repo_path:
-            self.root.after(200, self._prompt_repo_setup)
+                self.root.after(200, self._prompt_repo_setup)
 
     # ------------------------------------------------------------------ #
     # Font
@@ -533,100 +529,34 @@ class Editor:
     # Version Control (Dulwich / Git)
     # ------------------------------------------------------------------ #
 
-    def _load_repo_state(self):
-        """Load last-used repository path from state file."""
-        if not os.path.exists(_STATE_FILE):
-            return None
-        try:
-            with open(_STATE_FILE, "r", encoding="utf-8") as f:
-                state = json.load(f)
-            return state.get("last_repo")
-        except Exception:
-            return None
-
-    def _save_repo_state(self, repo_path):
-        """Save current repository path to state file."""
-        os.makedirs(_STATE_DIR, exist_ok=True)
-        state = {}
-        if os.path.exists(_STATE_FILE):
-            try:
-                with open(_STATE_FILE, "r", encoding="utf-8") as f:
-                    state = json.load(f)
-            except Exception:
-                pass
-        state["last_repo"] = repo_path
-        fd, tmp = tempfile.mkstemp(dir=_STATE_DIR, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(state, f, indent=2)
-            os.replace(tmp, _STATE_FILE)
-        except Exception:
-            os.unlink(tmp)
-            raise
-
     def _prompt_repo_setup(self):
         """Startup dialog to guide new users into creating a repository."""
-        docs = os.path.join(os.path.expanduser("~"), "Documents")
-        base = docs if os.path.isdir(docs) else os.path.expanduser("~")
-
+        repo_dir = _default_poems_dir()
         popup = tk.Toplevel(self.root)
-        popup.title("Set Up a Repository")
+        popup.title("Set Up Repository")
         popup.transient(self.root)
         popup.resizable(False, False)
         popup.grab_set()
 
         tk.Label(
             popup,
-            text="Poetit keeps your poems under version control.\nGive your poetry folder a name to get started.",
-            justify="left", padx=12, pady=(12, 4),
+            text="Poetit keeps your poems under version control.\n\n"
+                 f"Repository: {repo_dir}",
+            justify="left", padx=12, pady=(12, 8),
         ).pack(anchor="w")
 
-        name_frame = tk.Frame(popup)
-        name_frame.pack(fill="x", padx=12, pady=(4, 0))
-        tk.Label(name_frame, text="Folder name:").pack(side="left")
-        name_var = tk.StringVar(value="poetry")
-        name_entry = tk.Entry(name_frame, textvariable=name_var, width=28)
-        name_entry.pack(side="left", padx=(8, 0))
-        name_entry.focus_set()
-        name_entry.select_range(0, tk.END)
-
-        tk.Label(
-            popup,
-            text=f"Location: {base}",
-            fg="#555", font=("Helvetica", 9),
-            padx=12,
-        ).pack(anchor="w", pady=(2, 8))
-
         def _do_setup():
-            name = name_var.get().strip()
-            if not name:
-                messagebox.showwarning("Name required", "Please enter a folder name.", parent=popup)
-                return
-            repo_dir = os.path.join(base, name)
-            if os.path.exists(repo_dir):
-                try:
-                    Repo(repo_dir).close()
-                    self._repo_path = repo_dir
-                    self._save_repo_state(repo_dir)
-                    self._update_title()
-                    popup.destroy()
-                    return
-                except _dulwich_errors.NotGitRepository:
-                    if not messagebox.askyesno(
-                        "Folder exists",
-                        f'"{repo_dir}" exists but is not a repository.\nInitialise it as one?',
-                        parent=popup,
-                    ):
-                        return
             try:
-                os.makedirs(repo_dir, exist_ok=True)
-                Repo.init(repo_dir)
-                self._repo_path = repo_dir
-                self._save_repo_state(repo_dir)
-                self._update_title()
-                popup.destroy()
-            except Exception as exc:
-                messagebox.showerror("Error", f"Could not create repository:\n{exc}", parent=popup)
+                Repo(repo_dir).close()
+            except _dulwich_errors.NotGitRepository:
+                try:
+                    Repo.init(repo_dir)
+                except Exception as exc:
+                    messagebox.showerror("Error", f"Could not create repository:\n{exc}", parent=popup)
+                    return
+            self._repo_path = repo_dir
+            self._update_title()
+            popup.destroy()
 
         btn_frame = tk.Frame(popup)
         btn_frame.pack(pady=(0, 12))
@@ -634,109 +564,28 @@ class Editor:
             side="left", padx=8
         )
         tk.Button(btn_frame, text="Skip for now", command=popup.destroy).pack(side="left", padx=8)
-        name_entry.bind("<Return>", lambda e: _do_setup())
-
-    def _new_repo(self):
-        """Create a new git repository and set up the poems directory."""
-        popup = tk.Toplevel(self.root)
-        popup.title("New Repository")
-        popup.transient(self.root)
-        popup.resizable(False, False)
-        popup.grab_set()
-
-        tk.Label(popup, text="Repository name:").pack(anchor="w", padx=12, pady=(10, 2))
-        name_var = tk.StringVar(value="poetry")
-        name_entry = tk.Entry(popup, textvariable=name_var, width=40)
-        name_entry.pack(anchor="w", padx=12)
-        name_entry.focus_set()
-        name_entry.select_range(0, tk.END)
-
-        tk.Label(popup, text="Location:").pack(anchor="w", padx=12, pady=(8, 2))
-        path_var = tk.StringVar(value=os.path.join(os.path.expanduser("~"), "Documents"))
-        path_frame = tk.Frame(popup)
-        path_frame.pack(anchor="w", padx=12)
-        path_entry = tk.Entry(path_frame, textvariable=path_var, width=32)
-        path_entry.pack(side="left")
-        tk.Button(
-            path_frame, text="Browse\u2026",
-            command=lambda: _browse(),
-        ).pack(side="left", padx=(4, 0))
-
-        def _browse():
-            d = filedialog.askdirectory(
-                title="Select Parent Directory",
-                initialdir=path_var.get() or os.path.expanduser("~"),
-            )
-            if d:
-                path_var.set(d)
-
-        def _do_create():
-            name = name_var.get().strip()
-            base = path_var.get().strip()
-            if not name:
-                messagebox.showwarning("Error", "Repository name is required.")
-                return
-            if not base:
-                messagebox.showwarning("Error", "Location is required.")
-                return
-            repo_dir = os.path.join(base, name)
-            if os.path.exists(repo_dir):
-                # If it's already a valid git repo, reuse it
-                try:
-                    Repo(repo_dir).close()
-                    self._repo_path = repo_dir
-                    self._save_repo_state(repo_dir)
-                    self._current_path = None
-                    self._new()
-                    self._update_title()
-                    popup.destroy()
-                    return
-                except _dulwich_errors.NotGitRepository:
-                    messagebox.showerror("Error", f"Directory already exists and is not a Git repo:\n{repo_dir}")
-                    return
-            os.makedirs(repo_dir)
-            try:
-                Repo.init(repo_dir)
-                self._repo_path = repo_dir
-                self._save_repo_state(repo_dir)
-
-                if self._current_path or self._is_dirty:
-                    # Save current poem into the repository, even if it was from
-                    # outside the repo — copy it in.
-                    src_name = os.path.basename(self._current_path) if self._current_path else "poem.txt"
-                    dest = os.path.join(repo_dir, src_name)
-                    self._write_files(dest)
-                    self._do_commit_and_stage("Initial commit")
-                else:
-                    self._new()
-                self._update_title()
-                popup.destroy()
-            except Exception as exc:
-                messagebox.showerror("Error", f"Could not create repository:\n{exc}")
-
-        tk.Button(popup, text="Create Repository", command=_do_create).pack(pady=12)
-        name_entry.bind("<Return>", lambda e: _do_create())
+        popup.bind("<Return>", lambda e: _do_setup())
 
     def _open_repo(self):
-        """Open an existing repository and show its contents."""
+        """Open the fixed repository and show its contents, creating it if needed."""
         if not self._confirm_discard():
             return
-        last_repo = self._load_repo_state()
-        repo_path = filedialog.askdirectory(
-            title="Select Repository",
-            initialdir=last_repo or os.path.join(os.path.expanduser("~"), "Documents"),
-        )
-        if not repo_path:
-            return
+        repo_dir = _default_poems_dir()
         try:
-            repo = Repo(repo_path)
-            repo.close()
+            Repo(repo_dir).close()
         except _dulwich_errors.NotGitRepository:
-            messagebox.showerror("Error", "Not a valid Git repository.")
-            return
-        self._repo_path = repo_path
-        self._save_repo_state(repo_path)
-        self._show_repo_browser(repo_path)
+            if not messagebox.askyesno(
+                "Set Up Repository",
+                f"No repository found at:\n{repo_dir}\n\nInitialise it now?",
+            ):
+                return
+            try:
+                Repo.init(repo_dir)
+            except Exception as exc:
+                messagebox.showerror("Error", f"Could not create repository:\n{exc}")
+                return
+        self._repo_path = repo_dir
+        self._show_repo_browser(repo_dir)
 
     def _show_repo_browser(self, repo_path):
         """Show a dialog listing the repository's .txt files."""
@@ -1682,8 +1531,7 @@ class Editor:
         fm.add_command(label="Save",     command=self._save)
         fm.add_command(label="Save As…", command=self._save_as)
         fm.add_separator()
-        fm.add_command(label="Open Repository (Version Control)",       command=self._open_repo)
-        fm.add_command(label="New Repository (Enable Version Control)", command=self._new_repo)
+        fm.add_command(label="Browse Repository",  command=self._open_repo)
         fm.add_separator()
         fm.add_command(label="Import…",  command=self._import)
         fm.add_command(label="Export…",  command=self._export)
@@ -1721,6 +1569,7 @@ class Editor:
         menu.add_command(label="    ", state="disabled")
         menu.add_command(label="    ", state="disabled")
         menu.add_cascade(label="Help", menu=help_menu)
+        menu.add_command(label="~/Documents/Poetit", state="disabled")
 
         self.root.config(menu=menu)
 
@@ -2859,87 +2708,29 @@ class Editor:
             messagebox.showerror("Export Error", f"Could not export file:\n{exc}")
 
     def _ensure_repo_for_import_export(self):
-        """Ensure a repo exists; if not, prompt to create one. Returns True if repo is ready."""
-        if getattr(self, "_repo_path", None) and os.path.exists(self._repo_path):
+        """Ensure the fixed repo exists; offer to create it if not. Returns True if ready."""
+        repo_dir = _default_poems_dir()
+        if getattr(self, "_repo_path", None) == repo_dir and os.path.exists(repo_dir):
             return True
-        answer = messagebox.askyesno(
+        try:
+            Repo(repo_dir).close()
+            self._repo_path = repo_dir
+            return True
+        except _dulwich_errors.NotGitRepository:
+            pass
+        if not messagebox.askyesno(
             "No Repository",
-            "Import and Export require a repository.\n\n"
-            "Would you like to create one now?",
-        )
-        if not answer:
+            f"Import and Export require a repository.\n\n"
+            f"Create one now at:\n{repo_dir}?",
+        ):
             return False
-        # Inline repo creation — reuse _new_repo logic but non-destructively
-        popup = tk.Toplevel(self.root)
-        popup.title("Create Repository")
-        popup.transient(self.root)
-        popup.resizable(False, False)
-        popup.grab_set()
-
-        tk.Label(popup, text="Repository name:").pack(anchor="w", padx=12, pady=(10, 2))
-        name_var = tk.StringVar(value="poetry")
-        name_entry = tk.Entry(popup, textvariable=name_var, width=40)
-        name_entry.pack(anchor="w", padx=12)
-        name_entry.focus_set()
-        name_entry.select_range(0, tk.END)
-
-        tk.Label(popup, text="Location:").pack(anchor="w", padx=12, pady=(8, 2))
-        path_var = tk.StringVar(value=os.path.join(os.path.expanduser("~"), "Documents"))
-        path_frame = tk.Frame(popup)
-        path_frame.pack(anchor="w", padx=12)
-        tk.Entry(path_frame, textvariable=path_var, width=32).pack(side="left")
-        tk.Button(
-            path_frame, text="Browse\u2026",
-            command=lambda: _browse(),
-        ).pack(side="left", padx=(4, 0))
-
-        def _browse():
-            d = filedialog.askdirectory(
-                title="Select Parent Directory",
-                initialdir=path_var.get() or os.path.expanduser("~"),
-            )
-            if d:
-                path_var.set(d)
-
-        result = {"ok": False}
-
-        def _do_create():
-            name = name_var.get().strip()
-            base = path_var.get().strip()
-            if not name:
-                messagebox.showwarning("Error", "Repository name is required.")
-                return
-            if not base:
-                messagebox.showwarning("Error", "Location is required.")
-                return
-            repo_dir = os.path.join(base, name)
-            if os.path.exists(repo_dir):
-                # If it's already a valid git repo, reuse it
-                try:
-                    Repo(repo_dir).close()
-                    self._repo_path = repo_dir
-                    self._save_repo_state(repo_dir)
-                    result["ok"] = True
-                    popup.destroy()
-                    return
-                except _dulwich_errors.NotGitRepository:
-                    messagebox.showerror("Error", f"Directory already exists and is not a Git repo:\n{repo_dir}")
-                    return
-            os.makedirs(repo_dir)
-            try:
-                Repo.init(repo_dir)
-                self._repo_path = repo_dir
-                self._save_repo_state(repo_dir)
-                result["ok"] = True
-                popup.destroy()
-            except Exception as exc:
-                messagebox.showerror("Error", f"Could not create repository:\n{exc}")
-
-        tk.Button(popup, text="Create Repository", command=_do_create).pack(pady=12)
-        name_entry.bind("<Return>", lambda e: _do_create())
-
-        popup.wait_window()
-        return result.get("ok", False)
+        try:
+            Repo.init(repo_dir)
+            self._repo_path = repo_dir
+            return True
+        except Exception as exc:
+            messagebox.showerror("Error", f"Could not create repository:\n{exc}")
+            return False
 
 
 def _load_icon(master=None):
