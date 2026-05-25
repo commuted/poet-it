@@ -380,8 +380,7 @@ class Linguistics:
             if result is not None:
                 self._stanza_nlp = result
             else:
-                model_dir = os.path.join(os.path.expanduser('~'), 'stanza_resources', 'en')
-                self._stanza_needs_download = not os.path.isdir(model_dir)
+                self._stanza_needs_download = True
             self._stanza_loading = False
 
     @property
@@ -421,8 +420,7 @@ class Linguistics:
             with self._stanza_lock:
                 self._stanza_nlp = result
                 if result is None:
-                    model_dir = os.path.join(os.path.expanduser('~'), 'stanza_resources', 'en')
-                    self._stanza_needs_download = not os.path.isdir(model_dir)
+                    self._stanza_needs_download = True
                 self._stanza_loading = False
             nlp = result
         if nlp is None:
