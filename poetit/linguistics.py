@@ -363,6 +363,17 @@ class Linguistics:
         with self._stanza_lock:
             return self._stanza_loading
 
+    @staticmethod
+    def _stanza_model_on_disk():
+        """Return True if the stanza English model files are present on disk."""
+        tokenize_dir = os.path.join(
+            os.path.expanduser('~'), 'stanza_resources', 'en', 'tokenize'
+        )
+        try:
+            return bool(os.listdir(tokenize_dir))
+        except OSError:
+            return False
+
     def _load_stanza_background(self):
         with self._stanza_lock:
             if not STANZA_AVAILABLE or self._stanza_nlp is not None or self._stanza_loading:
@@ -380,7 +391,7 @@ class Linguistics:
             if result is not None:
                 self._stanza_nlp = result
             else:
-                self._stanza_needs_download = True
+                self._stanza_needs_download = not self._stanza_model_on_disk()
             self._stanza_loading = False
 
     @property
@@ -420,7 +431,7 @@ class Linguistics:
             with self._stanza_lock:
                 self._stanza_nlp = result
                 if result is None:
-                    self._stanza_needs_download = True
+                    self._stanza_needs_download = not self._stanza_model_on_disk()
                 self._stanza_loading = False
             nlp = result
         if nlp is None:
