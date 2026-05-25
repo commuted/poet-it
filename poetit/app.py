@@ -1407,17 +1407,64 @@ class Editor:
             return
         doc = self._nlp.get_stanza_doc(text)
         if doc is None:
-            messagebox.showerror(
-                "Diagram",
-                "Stanza model failed to load.\n"
-                "Check your internet connection and restart the application."
-            )
+            if self._nlp.stanza_needs_download:
+                self._offer_stanza_download(text)
+            else:
+                messagebox.showerror(
+                    "Diagram",
+                    "Stanza model failed to load.\n"
+                    "Check your internet connection and restart the application."
+                )
             return
         popups.show_diagram_popup(
             self.root, text, doc,
             self.root.winfo_screenwidth(),
             self.root.winfo_screenheight(),
         )
+
+    def _offer_stanza_download(self, text):
+        if not messagebox.askyesno(
+            "Download Model",
+            "The Stanza English model hasn't been downloaded yet (~500 MB).\n\n"
+            "Download it now? An internet connection is required.",
+        ):
+            return
+
+        progress = tk.Toplevel(self.root)
+        progress.title("Downloading")
+        progress.resizable(False, False)
+        tk.Label(
+            progress,
+            text="Downloading Stanza English model…\nThis may take a few minutes.",
+            padx=20, pady=20,
+        ).pack()
+        progress.grab_set()
+        progress.update()
+
+        result = [None]
+
+        def do_download():
+            ok = self._nlp.download_stanza_model()
+            if ok:
+                self._nlp._load_stanza_background()
+            result[0] = ok
+
+        def check_done():
+            if result[0] is None:
+                self.root.after(500, check_done)
+                return
+            progress.destroy()
+            if result[0]:
+                self._diagram_click()
+            else:
+                messagebox.showerror(
+                    "Download Failed",
+                    "Failed to download the Stanza model.\n"
+                    "Check your internet connection and try again."
+                )
+
+        threading.Thread(target=do_download, daemon=True).start()
+        self.root.after(500, check_done)
 
     # ------------------------------------------------------------------ #
     # Rhyme scheme column

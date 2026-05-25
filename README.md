@@ -13,14 +13,14 @@ pip install -e .
 For the full feature set install the optional extras:
 
 ```bash
-pip install spacy resvg_py Pillow
-python -m spacy download en_core_web_md
+pip install stanza resvg_py Pillow
+python -c "import stanza; stanza.download('en')"
 ```
 
 | Feature | Requires |
 |---|---|
 | Meter analysis (enhanced) | `prosodic` |
-| Dependency diagram | `spacy`, `resvg_py`, `Pillow` |
+| Dependency diagram | `stanza`, `resvg_py`, `Pillow` |
 | Version control | `dulwich` (included by default) |
 
 NLTK data (punkt tokenizer, POS tagger) is downloaded automatically on first launch if not already present. CMUDict and WordNet are bundled with the package — no separate download needed.
@@ -94,7 +94,7 @@ Click on a word then click **Thesaurus** to see synonyms. Click a synonym to rep
 
 ### Dependency diagram
 
-Click on a line then click **Diagram** to render a spaCy dependency parse of that line. Shows the grammatical relationships between words, with POS tags and dependency labels. Requires `spacy`, `resvg_py`, and `Pillow`.
+Click on a line then click **Diagram** to render a Stanza dependency parse of that line. Shows the grammatical relationships between words, with POS tags and dependency labels. Requires `stanza`, `resvg_py`, and `Pillow`.
 
 ---
 
@@ -170,7 +170,7 @@ Tests cover `file_io` (round-trip write/read, metadata, edge cases) and `linguis
 - Python ≥ 3.10
 - nltk ≥ 3.8
 - prosodic ≥ 3.0
-- spacy ≥ 3.8 *(optional — diagram feature)*
+- stanza ≥ 1.0 *(optional — diagram feature)*
 - resvg_py ≥ 0.3 *(optional — diagram rendering)*
 - Pillow ≥ 9.0 *(optional — diagram display)*
 - dulwich ≥ 0.22 *(version control)*

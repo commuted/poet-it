@@ -144,9 +144,10 @@ class Linguistics:
         self._thesaurus_lock     = threading.Lock()
         self._thesaurus          = None
         self._thesaurus_loading  = False
-        self._stanza_lock        = threading.Lock()
-        self._stanza_nlp         = None
-        self._stanza_loading     = False
+        self._stanza_lock           = threading.Lock()
+        self._stanza_nlp            = None
+        self._stanza_loading        = False
+        self._stanza_needs_download = False
         self._spell              = _SpellChecker() if SPELLCHECKER_AVAILABLE else None
 
     def start_background_loads(self):
@@ -378,7 +379,25 @@ class Linguistics:
         with self._stanza_lock:
             if result is not None:
                 self._stanza_nlp = result
+            else:
+                model_dir = os.path.join(os.path.expanduser('~'), 'stanza_resources', 'en')
+                self._stanza_needs_download = not os.path.isdir(model_dir)
             self._stanza_loading = False
+
+    @property
+    def stanza_needs_download(self):
+        with self._stanza_lock:
+            return self._stanza_needs_download
+
+    def download_stanza_model(self):
+        """Download the Stanza English model. Runs synchronously; call from a background thread."""
+        try:
+            _stanza.download('en', verbose=False)
+            with self._stanza_lock:
+                self._stanza_needs_download = False
+            return True
+        except Exception:
+            return False
 
     def get_stanza_doc(self, text):
         if not STANZA_AVAILABLE:
@@ -401,6 +420,9 @@ class Linguistics:
                 result = None
             with self._stanza_lock:
                 self._stanza_nlp = result
+                if result is None:
+                    model_dir = os.path.join(os.path.expanduser('~'), 'stanza_resources', 'en')
+                    self._stanza_needs_download = not os.path.isdir(model_dir)
                 self._stanza_loading = False
             nlp = result
         if nlp is None:
