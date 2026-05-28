@@ -173,6 +173,7 @@ Tests cover `file_io` (round-trip write/read, metadata, edge cases) and `linguis
 - nltk ≥ 3.8
 - prosodic ≥ 3.0
 - stanza ≥ 1.0 *(optional — diagram feature)*
+- transformers>=4.0 *(optional — diagram feature)*
 - resvg_py ≥ 0.3 *(optional — diagram rendering)*
 - Pillow ≥ 9.0 *(optional — diagram display)*
 - dulwich ≥ 0.22 *(version control)*
