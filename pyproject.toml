@@ -53,6 +53,7 @@ dev = ["build", "twine", "pytest>=8.0"]
 
 [project.scripts]
 poetit = "poetit.app:main"
+poetit-install-desktop = "poetit.app:setup_linux_desktop"
 
 [project.gui-scripts]
 poetit-gui = "poetit.app:main"

@@ -10,8 +10,12 @@ finish-args:
   - --socket=wayland
   - --share=ipc
   - --device=dri
-  # Poems directory — minimal filesystem grant
+  # Poems directory
   - --filesystem=~/Documents/Poetit:create
+  # App state (~/.poetit), NLTK data, Stanza model
+  - --filesystem=~/.poetit:create
+  - --filesystem=~/nltk_data:create
+  - --filesystem=~/stanza_resources:create
   # Stanza downloads its English model on first run
   - --share=network
 
@@ -19,7 +23,7 @@ modules:
   # ── Python dependencies ─────────────────────────────────────────────────
   # flatpak-pip-generator can regenerate this list from requirements.txt:
   #   flatpak-pip-generator --runtime org.gnome.Platform//46 \
-  #       nltk prosodic stanza pyspellchecker Pillow dulwich resvg_py
+  #       nltk prosodic stanza transformers pyspellchecker Pillow dulwich resvg_py
   # The generated JSON files are then included here via:
   #   - python3-nltk.json
   #   - python3-prosodic.json
@@ -36,6 +40,7 @@ modules:
           nltk>=3.8
           prosodic>=3.0
           stanza>=1.7
+          transformers>=4.0
           pyspellchecker>=0.7
           Pillow>=9.0
           dulwich>=0.22
@@ -51,6 +56,10 @@ modules:
       - pip3 install --prefix=/app --no-deps --no-build-isolation .
       - install -Dm644 LICENSE /app/share/licenses/io.github.commuted.Poetit/LICENSE
       - install -Dm644 NOTICE  /app/share/licenses/io.github.commuted.Poetit/NOTICE
+      - install -Dm644 poetit/data/icon.png
+            /app/share/icons/hicolor/256x256/apps/io.github.commuted.Poetit.png
+      - install -Dm644 poetit/data/icon.png
+            /app/share/icons/hicolor/512x512/apps/io.github.commuted.Poetit.png
       - install -Dm644 packaging/flatpak/io.github.commuted.Poetit.desktop
             /app/share/applications/io.github.commuted.Poetit.desktop
       - install -Dm644 packaging/flatpak/io.github.commuted.Poetit.metainfo.xml

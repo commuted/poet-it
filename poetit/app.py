@@ -2804,8 +2804,56 @@ def _load_icon(master=None):
         return None
 
 
+def setup_linux_desktop():
+    """Install the .desktop file and icon for GNOME/Ubuntu launcher integration.
+
+    Run this once after pip install:  poetit-install-desktop
+    """
+    import shutil, subprocess, sys
+    if sys.platform != "linux":
+        print("This command is only needed on Linux.")
+        return
+
+    try:
+        from importlib.resources import files as _res_files
+        data_dir = str(_res_files('poetit').joinpath('data'))
+    except Exception:
+        data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+
+    xdg_data = os.environ.get("XDG_DATA_HOME",
+                              os.path.join(os.path.expanduser("~"), ".local", "share"))
+
+    # Install icon at every standard hicolor size that we have (use the same
+    # source PNG for all sizes; the DE will pick the best fit).
+    icon_src = os.path.join(data_dir, "icon.png")
+    for size in ("16x16", "32x32", "48x48", "64x64", "128x128", "256x256", "512x512"):
+        icon_dst_dir = os.path.join(xdg_data, "icons", "hicolor", size, "apps")
+        os.makedirs(icon_dst_dir, exist_ok=True)
+        shutil.copy2(icon_src, os.path.join(icon_dst_dir, "poetit.png"))
+
+    # Install the .desktop file.
+    apps_dir = os.path.join(xdg_data, "applications")
+    os.makedirs(apps_dir, exist_ok=True)
+    shutil.copy2(os.path.join(data_dir, "poetit.desktop"),
+                 os.path.join(apps_dir, "poetit.desktop"))
+
+    # Refresh caches so the DE picks up the changes immediately.
+    for cmd in (
+        ["update-desktop-database", apps_dir],
+        ["gtk-update-icon-cache", "-f", "-t",
+         os.path.join(xdg_data, "icons", "hicolor")],
+    ):
+        try:
+            subprocess.run(cmd, check=False, capture_output=True)
+        except FileNotFoundError:
+            pass
+
+    print("Desktop integration installed. You may need to log out and back in"
+          " for the launcher icon to update.")
+
+
 def main():
-    root = tk.Tk()
+    root = tk.Tk(className="Poetit")
     root.withdraw()
 
     _icon = _load_icon(master=root)
