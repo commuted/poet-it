@@ -13,6 +13,7 @@ depends=(
     'python-pillow'
     'python-dulwich'
     'python-pyspellchecker'
+    'python-transformers'
 )
 makedepends=(
     'python-build'
@@ -23,7 +24,7 @@ makedepends=(
 optdepends=(
     'python-stanza: dependency diagram support (downloads model on first run)'
     'python-prosodic: enhanced meter analysis'
-    'resvg_py: SVG diagram rendering'
+    'python-resvg-py: SVG diagram rendering'
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/commuted/$pkgname/archive/v$pkgver.tar.gz")
 sha256sums=('SKIP')   # replace with actual sha256 before AUR submission
@@ -38,4 +39,10 @@ package() {
     python -m installer --destdir="$pkgdir" dist/*.whl
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     install -Dm644 NOTICE  "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
+    install -Dm644 poetit/data/icon.png \
+        "$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
+    install -Dm644 poetit/data/icon.png \
+        "$pkgdir/usr/share/icons/hicolor/512x512/apps/$pkgname.png"
+    install -Dm644 poetit/data/poetit.desktop \
+        "$pkgdir/usr/share/applications/$pkgname.desktop"
 }
