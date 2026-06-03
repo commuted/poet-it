@@ -10,6 +10,7 @@ Features:
   - Word definitions and dependency diagrams
   - Thesaurus integration
   - Spell check with inline suggestions
+  - Version control (dulwich git compatible repo)
 
 Libraries:
   Stanza — Stanford NLP Group

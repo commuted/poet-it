@@ -12,6 +12,7 @@ description: |
     - Dependency-parse diagrams via Stanza (Stanford NLP)
     - Git-based version control with commit history browser
     - Spell check with inline suggestions
+    - Version control (dulwich git compatible repo)
 
   Poems are stored in ~/Documents/Poetit/.
   No Electron, no browser — pure Python desktop app.
