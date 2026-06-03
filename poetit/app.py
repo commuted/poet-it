@@ -1279,7 +1279,14 @@ class Editor:
                 "Click in your poem first, then press Diagram."
             )
             return
-        text = self.lines[self._last_focus_row][0].get().strip()
+        row = self._last_focus_row
+        te  = self.lines[row][0]
+        raw = te.get()
+        try:
+            cursor = te.index(tk.INSERT)
+        except tk.TclError:
+            cursor = self._last_focus_cursor
+        text = _sentence_at_cursor(raw, cursor).strip()
         if not text:
             messagebox.showinfo("Diagram", "The current line is empty.")
             return
@@ -2787,6 +2794,38 @@ class Editor:
         except Exception as exc:
             messagebox.showerror("Error", f"Could not create repository:\n{exc}")
             return False
+
+
+def _sentence_at_cursor(text, cursor_col):
+    """Return the sentence under the cursor when text contains multiple
+    period-space-delimited sentences; otherwise return text unchanged.
+
+    Splitting only triggers when '. ' (period + whitespace) appears inside the
+    string, meaning at least two sentences are present.  A single trailing
+    period (common in poetry) leaves the whole line intact.
+    """
+    import re
+    segs = re.split(r'(?<=\.)\s+', text)
+    if len(segs) < 2:
+        return text
+
+    # Rebuild the character-start position of each segment so we can map the
+    # cursor column back to a segment index.
+    pos = 0
+    starts = []
+    for seg in segs:
+        starts.append(pos)
+        pos += len(seg)
+        # advance past the whitespace delimiter that was consumed by the split
+        while pos < len(text) and text[pos] in ' \t':
+            pos += 1
+
+    # Find the last segment whose start is at or before the cursor.
+    idx = 0
+    for i, start in enumerate(starts):
+        if cursor_col >= start:
+            idx = i
+    return segs[idx].strip()
 
 
 def _load_icon(master=None):
