@@ -23,6 +23,37 @@
     </ul>
   </description>
 
+  <screenshots>
+    <screenshot type="default">
+      <image type="source" width="1835" height="905">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/dependency.png</image>
+      <caption>Dependency parse diagram powered by Stanza</caption>
+    </screenshot>
+    <screenshot>
+      <image type="source" width="891" height="744">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/spell.png</image>
+      <caption>Inline spell checking with suggestions</caption>
+    </screenshot>
+    <screenshot>
+      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/prosodic.png</image>
+      <caption>Stress-marked meter analysis</caption>
+    </screenshot>
+    <screenshot>
+      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/rhyme.png</image>
+      <caption>Rhyme scheme detection and word-level rhyme lookup</caption>
+    </screenshot>
+    <screenshot>
+      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/thesaurus.png</image>
+      <caption>Integrated thesaurus and WordNet definitions</caption>
+    </screenshot>
+    <screenshot>
+      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/definition.png</image>
+      <caption>Word definitions from bundled WordNet</caption>
+    </screenshot>
+    <screenshot>
+      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/version.png</image>
+      <caption>Git-based version control and commit history browser</caption>
+    </screenshot>
+  </screenshots>
+
   <url type="homepage">https://github.com/commuted/poetit</url>
   <url type="bugtracker">https://github.com/commuted/poetit/issues</url>
 
