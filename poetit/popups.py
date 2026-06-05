@@ -13,11 +13,14 @@ except ImportError:
 _POS_LABEL = {'n': 'Noun', 'v': 'Verb', 'a': 'Adjective', 's': 'Adjective', 'r': 'Adverb'}
 
 
-def show_word_list_popup(root, title, header, words, on_select, width=220, height=320):
+def show_word_list_popup(root, title, header, words, on_select, width=220, height=320, note=None):
     popup = tk.Toplevel(root)
     popup.title(title)
     popup.transient(root)
     popup.resizable(False, True)
+
+    if note:
+        tk.Label(popup, text=note, anchor='w', fg='#226622').pack(fill=tk.X, padx=6, pady=(6, 0))
 
     tk.Label(popup, text=header, anchor='w').pack(fill=tk.X, padx=6, pady=(6, 2))
 

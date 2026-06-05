@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import tempfile
 import threading
 import tkinter as tk
@@ -109,6 +110,77 @@ _FONT_CANDIDATES = [
 
 
 
+class _LineText(tk.Text):
+    """Single-line Text widget with a tk.Entry-compatible API.
+
+    tk.Text supports character-range tags, which enables per-word spell marks.
+    The wrapper translates Entry-style arguments (integer indices, tk.END, etc.)
+    to Text-style indices so the rest of the editor needs no changes.
+    """
+
+    def __init__(self, master, **kw):
+        kw.setdefault('height', 1)
+        kw.setdefault('wrap', 'none')
+        kw.setdefault('undo', True)
+        kw.setdefault('padx', 0)
+        kw.setdefault('pady', 0)
+        super().__init__(master, **kw)
+        self.tag_config('misspelled', foreground='#cc0000', underline=True)
+
+    # -- Entry-compatible interface -----------------------------------------
+
+    def get(self, *args):
+        if not args:
+            return super().get('1.0', 'end-1c')
+        return super().get(*args)
+
+    def insert(self, index, chars, *args):
+        if index == 0:
+            index = '1.0'
+        elif isinstance(index, int):
+            index = f'1.{index}'
+        elif index == tk.END:
+            index = 'end-1c'  # keep before tk.Text's implicit trailing newline
+        super().insert(index, chars, *args)
+
+    def delete(self, first, last=None):
+        if first == 0:
+            first = '1.0'
+        elif isinstance(first, int):
+            first = f'1.{first}'
+        if last is None:
+            super().delete(first)
+        elif last == tk.END:
+            super().delete(first, 'end')
+        elif isinstance(last, int):
+            super().delete(first, f'1.{last}')
+        else:
+            super().delete(first, last)
+
+    def icursor(self, index):
+        if isinstance(index, int):
+            self.mark_set('insert', f'1.{index}')
+        elif index == tk.END:
+            self.mark_set('insert', 'end-1c')
+        else:
+            self.mark_set('insert', index)
+
+    def index(self, mark):
+        result = super().index(mark)
+        if mark == tk.INSERT:
+            return int(str(result).split('.')[1])
+        return result
+
+    def selection_present(self):
+        return bool(self.tag_ranges('sel'))
+
+    def selection_get(self):
+        return super().get('sel.first', 'sel.last')
+
+    def selection_clear(self):
+        self.tag_remove('sel', '1.0', 'end')
+
+
 class _MeterWorker(threading.Thread):
     """Compute meter strings for all lines in a background thread.
 
@@ -165,6 +237,7 @@ class Editor:
         self._meter_var     = tk.BooleanVar(value=False)
         self._meter_loading = False
         self._meter_gen     = 0
+        self._spell_active  = False
 
         self._spell_var        = tk.BooleanVar(value=False)
         self._spell_errors     = {}   # te_widget → [(word, start, end, suggestions), ...]
@@ -768,7 +841,7 @@ class Editor:
             if not name:
                 return
             # Ensure the path is inside the repo
-            rel = os.path.relpath(name, self._repo_path)
+            rel = os.path.relpath(name, self._repo_path).replace(os.sep, "/")
             if rel.startswith(".."):
                 messagebox.showerror("Error", "File must be inside the repository directory.")
                 return
@@ -811,9 +884,9 @@ class Editor:
             # Write current editor content to disk before committing
             self._write_files(self._current_path)
 
-            rel = os.path.relpath(self._current_path, self._repo_path)
+            rel = os.path.relpath(self._current_path, self._repo_path).replace(os.sep, "/")
             meta_path = file_io.meta_path(self._current_path)
-            meta_rel = os.path.relpath(meta_path, self._repo_path) if os.path.exists(meta_path) else None
+            meta_rel = os.path.relpath(meta_path, self._repo_path).replace(os.sep, "/") if os.path.exists(meta_path) else None
 
             _porcelain.add(self._repo_path, paths=[rel])
             if meta_rel:
@@ -898,6 +971,7 @@ class Editor:
 
     def _load_text_into_editor(self, text):
         """Replace editor content with given text."""
+        self._clear_spell_marks()
         file_lines = text.splitlines()
         while len(self.lines) < max(len(file_lines), INITIAL_LINES):
             self._add_row()
@@ -1010,7 +1084,7 @@ class Editor:
         # was editing when they opened the tree.
         active_file = None
         if getattr(self, "_current_path", None):
-            active_rel = os.path.relpath(self._current_path, self._repo_path)
+            active_rel = os.path.relpath(self._current_path, self._repo_path).replace(os.sep, "/")
             for c in commits:
                 if active_rel in c["files"]:
                     active_file = active_rel
@@ -1203,6 +1277,8 @@ class Editor:
         self._update_margin(row)
         if self._meter_var.get() and row < len(self._meter_rows):
             self._fill_meter_widget(self._meter_rows[row], new_text)
+        if self._spell_active:
+            self._update_spell_line(row)
 
     def _rhyme_click(self):
         if self._last_focus_row is not None:
@@ -1716,7 +1792,7 @@ class Editor:
         spec = self._font_spec()
         fname, fsize = spec
 
-        te = tk.Entry(
+        te = _LineText(
             self.inner, font=spec, relief="flat", bd=0,
             bg=self._theme_bg, highlightthickness=0, insertbackground=self._theme_fg,
         )
@@ -1797,7 +1873,7 @@ class Editor:
         spec = self._font_spec()
         fname, fsize = spec
 
-        te = tk.Entry(
+        te = _LineText(
             self.inner, font=spec, relief="flat", bd=0,
             bg=self._theme_bg, highlightthickness=0, insertbackground=self._theme_fg,
         )
@@ -2304,6 +2380,7 @@ class Editor:
     def _new(self):
         if not self._confirm_discard():
             return
+        self._spell_active = False
         # Reset meter before trimming so hidden widgets don't leak
         if self._meter_var.get():
             self._meter_var.set(False)
@@ -2558,6 +2635,8 @@ class Editor:
         except Exception as exc:
             messagebox.showerror("Open Error", f"Could not open file:\n{exc}")
             return
+
+        self._clear_spell_marks()
 
         while len(self.lines) < max(len(file_lines), INITIAL_LINES):
             self._add_row()

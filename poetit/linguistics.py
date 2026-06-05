@@ -135,6 +135,17 @@ def word_at_cursor(text, idx):
     return text[start:end], start, end
 
 
+def _levenshtein(a, b):
+    la, lb = len(a), len(b)
+    prev = list(range(lb + 1))
+    for i in range(1, la + 1):
+        curr = [i] + [0] * lb
+        for j in range(1, lb + 1):
+            curr[j] = min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + (a[i - 1] != b[j - 1]))
+        prev = curr
+    return prev[lb]
+
+
 class Linguistics:
     def __init__(self):
         _ensure_nltk_data()
@@ -330,12 +341,20 @@ class Linguistics:
     # Spell checking
     # ------------------------------------------------------------------ #
 
+    def misspelled_words(self, text):
+        """Return the set of lowercase unknown words found in text."""
+        if self._spell is None:
+            return set()
+        words = re.findall(r'[A-Za-z]+', text)
+        if not words:
+            return set()
+        return self._spell.unknown([w.lower() for w in words])
+
     def check_spelling(self, word):
         """Return (is_correct, [suggestions]) for word.
 
-        is_correct is True when the word is in the dictionary.
-        suggestions is a list of candidates sorted by edit distance,
-        empty when the word is correct or pyspellchecker is unavailable.
+        Suggestions are sorted by edit distance (closest first) then by
+        frequency descending within each edit-distance tier.
         """
         if self._spell is None:
             return True, []
@@ -344,7 +363,10 @@ class Linguistics:
             return True, []
         candidates = self._spell.candidates(lower) or set()
         candidates.discard(lower)
-        ranked = sorted(candidates, key=lambda w: self._spell.word_usage_frequency(w), reverse=True)
+        ranked = sorted(
+            candidates,
+            key=lambda w: (_levenshtein(lower, w), -self._spell.word_usage_frequency(w)),
+        )
         return False, ranked
 
     # ------------------------------------------------------------------ #

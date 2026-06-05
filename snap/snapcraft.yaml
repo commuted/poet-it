@@ -8,6 +8,7 @@ description: |
     - Syllable counts via bundled CMU Pronouncing Dictionary
     - Stress-marked meter display (prosodic or NLTK fallback)
     - Rhyme scheme detection and word-level rhyme lookup
+    - Spell check with inline misspelling marks and suggestions
     - Thesaurus and WordNet definitions (bundled)
     - Dependency-parse diagrams via Stanza (Stanford NLP)
     - Git-based version control with commit history browser
@@ -17,11 +18,17 @@ description: |
   Poems are stored in ~/Documents/Poetit/.
   No Electron, no browser — pure Python desktop app.
 
-grade: devel        # change to 'stable' before store submission
+grade: stable
 confinement: strict
-base: core22
+base: core24
 
 parts:
+  launcher:
+    plugin: dump
+    source: snap/local/
+    organize:
+      launch: bin/poetit-launch
+
   poetit:
     plugin: python
     source: .
@@ -34,12 +41,8 @@ parts:
 
 apps:
   poetit:
-    command: bin/poetit
+    command: bin/poetit-launch
     extensions: [gnome]
-    environment:
-      PYTHONPATH: $SNAP/lib/python3.10/site-packages
-      TCL_LIBRARY: $SNAP/usr/share/tcltk/tcl8.6
-      TK_LIBRARY:  $SNAP/usr/share/tcltk/tk8.6
     plugs:
       - personal-files
       - network          # Stanza downloads its English model on first use
