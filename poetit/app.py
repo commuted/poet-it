@@ -125,7 +125,6 @@ class _LineText(tk.Text):
         kw.setdefault('padx', 0)
         kw.setdefault('pady', 0)
         super().__init__(master, **kw)
-        self.tag_config('misspelled', foreground='#cc0000', underline=True)
 
     # -- Entry-compatible interface -----------------------------------------
 
@@ -166,8 +165,11 @@ class _LineText(tk.Text):
             self.mark_set('insert', index)
 
     def index(self, mark):
-        result = super().index(mark)
-        if mark == tk.INSERT:
+        m = mark
+        if isinstance(m, str) and m.startswith('@') and ',' not in m:
+            m = m + ',0'  # tk.Text requires @x,y; normalise bare @x
+        result = super().index(m)
+        if mark == tk.INSERT or (isinstance(mark, str) and mark.startswith('@')):
             return int(str(result).split('.')[1])
         return result
 
@@ -423,8 +425,8 @@ class Editor:
         errors = self._spell_errors.get(te, [])
         for word, start, end, suggestions in errors:
             try:
-                bx0 = te.tk.call(te._w, 'bbox', start)
-                bx1 = te.tk.call(te._w, 'bbox', end - 1)
+                bx0 = te.tk.call(te._w, 'bbox', f'1.{start}')
+                bx1 = te.tk.call(te._w, 'bbox', f'1.{end - 1}')
                 x1 = int(bx0[0])
                 x2 = int(bx1[0]) + int(bx1[2])
             except (tk.TclError, IndexError, ValueError):
@@ -475,7 +477,7 @@ class Editor:
             return
 
         try:
-            bx = te.tk.call(te._w, 'bbox', start)
+            bx = te.tk.call(te._w, 'bbox', f'1.{start}')
             x_rel = int(bx[0])
         except (tk.TclError, IndexError, ValueError):
             x_rel = 0
