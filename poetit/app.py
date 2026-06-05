@@ -237,8 +237,6 @@ class Editor:
         self._meter_var     = tk.BooleanVar(value=False)
         self._meter_loading = False
         self._meter_gen     = 0
-        self._spell_active  = False
-
         self._spell_var        = tk.BooleanVar(value=False)
         self._spell_errors     = {}   # te_widget → [(word, start, end, suggestions), ...]
         self._spell_underlines = {}   # te_widget → tk.Canvas (underline bar)
@@ -971,7 +969,7 @@ class Editor:
 
     def _load_text_into_editor(self, text):
         """Replace editor content with given text."""
-        self._clear_spell_marks()
+        self._spell_deactivate()
         file_lines = text.splitlines()
         while len(self.lines) < max(len(file_lines), INITIAL_LINES):
             self._add_row()
@@ -994,6 +992,8 @@ class Editor:
         self._update_rhyme_scheme()
         if self._meter_var.get():
             self._show_meter()
+        if self._spell_var.get():
+            self._spell_activate()
 
     def _tree_click(self):
         """Show a graphical version tree dialog."""
@@ -1277,8 +1277,9 @@ class Editor:
         self._update_margin(row)
         if self._meter_var.get() and row < len(self._meter_rows):
             self._fill_meter_widget(self._meter_rows[row], new_text)
-        if self._spell_active:
-            self._update_spell_line(row)
+        if self._spell_var.get() and row < len(self.lines):
+            self._spell_scan_row(te)
+            self._spell_draw_underlines(te)
 
     def _rhyme_click(self):
         if self._last_focus_row is not None:
@@ -2380,7 +2381,7 @@ class Editor:
     def _new(self):
         if not self._confirm_discard():
             return
-        self._spell_active = False
+        self._spell_deactivate()
         # Reset meter before trimming so hidden widgets don't leak
         if self._meter_var.get():
             self._meter_var.set(False)
@@ -2636,7 +2637,7 @@ class Editor:
             messagebox.showerror("Open Error", f"Could not open file:\n{exc}")
             return
 
-        self._clear_spell_marks()
+        self._spell_deactivate()
 
         while len(self.lines) < max(len(file_lines), INITIAL_LINES):
             self._add_row()
@@ -2669,6 +2670,8 @@ class Editor:
 
         if self._meter_var.get():
             self._show_meter()
+        if self._spell_var.get():
+            self._spell_activate()
 
         self._current_path = path
         self._mark_clean()
