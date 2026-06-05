@@ -1,0 +1,43 @@
+app-id: io.github.commuted.poetit
+runtime: org.gnome.Platform
+runtime-version: '48'
+sdk: org.gnome.Sdk
+command: poetit
+
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --filesystem=home
+  - --share=network          # stanza/spaCy models download on first launch
+  - --device=dri
+  - --env=PYTHONPATH=/app/lib/python3.12/site-packages
+
+modules:
+  - name: python3-poetit-deps
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --find-links=. --prefix=${FLATPAK_DEST}
+          nltk prosodic stanza resvg_py Pillow dulwich pyspellchecker
+    sources:
+      # python3-requirements.json must be generated before building — run:
+      #   ./flatpak/generate-pip-sources.sh
+      - python3-requirements.json
+
+  - name: poetit
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-build-isolation --no-deps --no-cache-dir --prefix=${FLATPAK_DEST} .
+      - install -Dm644 poetit/data/icon.png
+          /app/share/icons/hicolor/256x256/apps/io.github.commuted.poetit.png
+      - install -Dm644 flatpak/io.github.commuted.poetit.desktop
+          /app/share/applications/io.github.commuted.poetit.desktop
+    sources:
+      # For local builds use: type: dir, path: ..
+      # For Flathub replace with a git tag + commit:
+      #   type: git
+      #   url: https://github.com/commuted/poetit.git
+      #   tag: v0.1.0
+      #   commit: <full sha>
+      - type: dir
+        path: ..

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Name=Poetit
+GenericName=Poetry Editor
+Comment=Desktop poetry editor with meter, rhyme, spell check, and version control
+Exec=poetit %U
+Icon=io.github.commuted.poetit
+Terminal=false
+Type=Application
+Categories=Office;TextEditor;Education;
+Keywords=poetry;editor;rhyme;meter;thesaurus;linguistics;spell;
+StartupNotify=true
