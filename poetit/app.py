@@ -1838,8 +1838,10 @@ class Editor:
         self._bind_row(te, "<KeyRelease>", self._on_key)
         self._bind_row(te, "<Return>",     self._next)
         self._bind_row(te, "<BackSpace>",  self._backspace)
-        self._bind_row(te, "<Down>",       self._go, offset=1)
-        self._bind_row(te, "<Up>",         self._go, offset=-1)
+        te.bind("<Down>",  lambda e: self._down_virtual(e))
+        te.bind("<Up>",    lambda e: self._up_virtual(e))
+        te.bind("<Right>", lambda e: self._right_virtual(e))
+        te.bind("<Left>",  lambda e: self._left_virtual(e))
         self._bind_row(te, "<Tab>",        self._go, offset=1)
         self._bind_row(te, "<FocusIn>",    self._on_focus_in)
         self._bind_row(te, "<FocusOut>",   self._on_focus_out)
@@ -1941,8 +1943,10 @@ class Editor:
         self._bind_row(te, "<KeyRelease>", self._on_key)
         self._bind_row(te, "<Return>",     self._next)
         self._bind_row(te, "<BackSpace>",  self._backspace)
-        self._bind_row(te, "<Down>",       self._go, offset=1)
-        self._bind_row(te, "<Up>",         self._go, offset=-1)
+        te.bind("<Down>",  lambda e: self._down_virtual(e))
+        te.bind("<Up>",    lambda e: self._up_virtual(e))
+        te.bind("<Right>", lambda e: self._right_virtual(e))
+        te.bind("<Left>",  lambda e: self._left_virtual(e))
         self._bind_row(te, "<Tab>",        self._go, offset=1)
         self._bind_row(te, "<FocusIn>",    self._on_focus_in)
         self._bind_row(te, "<FocusOut>",   self._on_focus_out)
@@ -2001,6 +2005,87 @@ class Editor:
                 self._fill_meter_widget(self._meter_rows[row], te.get())
             if row + 1 < len(self._meter_rows):
                 self._fill_meter_widget(self._meter_rows[row + 1], after)
+        return "break"
+
+    def _right_virtual(self, event):
+        if event.state & 0x5:  # Shift or Control — let default handle it
+            return None
+        row = self._row_of(event.widget)
+        if row is None:
+            return "break"
+        te = self.lines[row][0]
+        try:
+            cursor = te.index(tk.INSERT)
+        except tk.TclError:
+            return None
+        text = te.get()
+        if cursor >= len(text):
+            te.insert(tk.END, ' ')
+            te.icursor(cursor + 1)
+            return "break"
+        return None  # allow default right-arrow within existing text
+
+    def _left_virtual(self, event):
+        if event.state & 0x5:  # Shift or Control — let default handle it
+            return None
+        row = self._row_of(event.widget)
+        if row is None:
+            return "break"
+        te = self.lines[row][0]
+        try:
+            cursor = te.index(tk.INSERT)
+        except tk.TclError:
+            return None
+        if cursor == 0 and row > 0:
+            prev_te = self.lines[row - 1][0]
+            prev_te.focus_set()
+            prev_te.icursor(tk.END)
+            return "break"
+        return None  # allow default left-arrow within existing text
+
+    def _up_virtual(self, event):
+        if event.state & 0x1:  # Shift held — let shift-row-selection handle it
+            return None
+        row = self._row_of(event.widget)
+        if row is None:
+            return "break"
+        self._clear_row_selection()
+        if row <= 0:
+            return "break"
+        te = self.lines[row][0]
+        try:
+            cursor_col = te.index(tk.INSERT)
+        except tk.TclError:
+            cursor_col = 0
+        target_te = self.lines[row - 1][0]
+        target_text = target_te.get()
+        if len(target_text) < cursor_col:
+            target_te.insert(tk.END, ' ' * (cursor_col - len(target_text)))
+        target_te.focus_set()
+        target_te.icursor(cursor_col)
+        return "break"
+
+    def _down_virtual(self, event):
+        if event.state & 0x1:  # Shift held — let shift-row-selection handle it
+            return None
+        row = self._row_of(event.widget)
+        if row is None:
+            return "break"
+        self._clear_row_selection()
+        te = self.lines[row][0]
+        try:
+            cursor_col = te.index(tk.INSERT)
+        except tk.TclError:
+            cursor_col = 0
+        target_row = row + 1
+        if target_row >= len(self.lines):
+            self._add_row()
+        target_te = self.lines[target_row][0]
+        target_text = target_te.get()
+        if len(target_text) < cursor_col:
+            target_te.insert(tk.END, ' ' * (cursor_col - len(target_text)))
+        target_te.focus_set()
+        target_te.icursor(cursor_col)
         return "break"
 
     def _go(self, row):
@@ -2679,7 +2764,7 @@ class Editor:
         self._mark_clean()
 
     def _write_files(self, path):
-        content = [te.get() for te, _ in self.lines]
+        content = [te.get().rstrip(' ') for te, _ in self.lines]
         while content and not content[-1]:
             content.pop()
         try:
