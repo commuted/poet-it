@@ -39,7 +39,6 @@ dependencies = [
     "transformers>=4.0",
     "resvg_py>=0.3",
     "Pillow>=9.0",
-    "dulwich>=0.22",
     "pyspellchecker>=0.7",
 ]
 

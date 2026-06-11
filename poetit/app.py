@@ -1,6 +1,8 @@
 import json
 import os
 import re
+import shutil
+import subprocess
 import tempfile
 import threading
 import tkinter as tk
@@ -12,14 +14,18 @@ from poetit.linguistics import Linguistics, word_at_cursor, STANZA_AVAILABLE as 
 from poetit import file_io, popups
 from poetit.popups import DIAGRAM_AVAILABLE as _DIAGRAM_AVAILABLE
 
-try:
-    from dulwich.repo import Repo
-    from dulwich.objects import Blob
-    from dulwich import porcelain as _porcelain
-    import dulwich.errors as _dulwich_errors
-    _VCS_AVAILABLE = True
-except ImportError:
-    _VCS_AVAILABLE = False
+_VCS_AVAILABLE = bool(shutil.which('git'))
+
+
+def _git(*args, cwd=None):
+    """Run a git command; return (returncode, decoded stdout)."""
+    r = subprocess.run(['git', *args], cwd=cwd, capture_output=True)
+    return r.returncode, r.stdout.decode('utf-8', errors='replace')
+
+
+def _is_git_repo(path):
+    rc, _ = _git('-C', path, 'rev-parse', '--git-dir')
+    return rc == 0
 
 # State file for persisting last-used repository
 _STATE_DIR = os.path.join(os.path.expanduser("~"), ".poetit")
@@ -69,13 +75,10 @@ def _seed_demo_poem(repo_dir):
     try:
         with open(dest, "w", encoding="utf-8") as f:
             f.write(_DEMO_POEM)
-        _porcelain.add(repo_dir, paths=[_DEMO_POEM_NAME])
-        _porcelain.commit(
-            repo_dir,
-            message=b"Add demo poem: Sonnet 43 by Elizabeth Barrett Browning",
-            author=b"Poetit <poetit@local>",
-            committer=b"Poetit <poetit@local>",
-        )
+        _git('-C', repo_dir, 'add', '--', _DEMO_POEM_NAME)
+        _git('-C', repo_dir,
+             '-c', 'user.name=Poetit', '-c', 'user.email=poetit@local',
+             'commit', '-m', 'Add demo poem: Sonnet 43 by Elizabeth Barrett Browning')
     except Exception:
         pass
 
@@ -269,10 +272,9 @@ class Editor:
 
         if _VCS_AVAILABLE:
             repo_dir = _default_poems_dir()
-            try:
-                Repo(repo_dir).close()
+            if _is_git_repo(repo_dir):
                 self._repo_path = repo_dir
-            except _dulwich_errors.NotGitRepository:
+            else:
                 self.root.after(200, self._prompt_repo_setup)
 
     # ------------------------------------------------------------------ #
@@ -660,15 +662,12 @@ class Editor:
         ).pack(anchor="w")
 
         def _do_setup():
-            try:
-                Repo(repo_dir).close()
-            except _dulwich_errors.NotGitRepository:
-                try:
-                    Repo.init(repo_dir)
-                    _seed_demo_poem(repo_dir)
-                except Exception as exc:
-                    messagebox.showerror("Error", f"Could not create repository:\n{exc}", parent=popup)
+            if not _is_git_repo(repo_dir):
+                rc, out = _git('-C', repo_dir, 'init')
+                if rc != 0:
+                    messagebox.showerror("Error", f"Could not create repository:\n{out}", parent=popup)
                     return
+                _seed_demo_poem(repo_dir)
             self._repo_path = repo_dir
             self._update_title()
             popup.destroy()
@@ -688,20 +687,17 @@ class Editor:
         if not self._confirm_discard():
             return
         repo_dir = _default_poems_dir()
-        try:
-            Repo(repo_dir).close()
-        except _dulwich_errors.NotGitRepository:
+        if not _is_git_repo(repo_dir):
             if not messagebox.askyesno(
                 "Set Up Repository",
                 f"No repository found at:\n{repo_dir}\n\nInitialise it now?",
             ):
                 return
-            try:
-                Repo.init(repo_dir)
-                _seed_demo_poem(repo_dir)
-            except Exception as exc:
-                messagebox.showerror("Error", f"Could not create repository:\n{exc}")
+            rc, out = _git('-C', repo_dir, 'init')
+            if rc != 0:
+                messagebox.showerror("Error", f"Could not create repository:\n{out}")
                 return
+            _seed_demo_poem(repo_dir)
         self._repo_path = repo_dir
         self._show_repo_browser(repo_dir)
 
@@ -712,29 +708,12 @@ class Editor:
         popup.transient(self.root)
         popup.geometry("500x400")
 
-        repo = Repo(repo_path)
-        try:
-            try:
-                head = repo.head()
-                tree = repo[repo[head].tree]
-            except Exception:
-                head = None
-                tree = None
-
-            files = []
-            if tree is not None:
-                for entry in tree.items():
-                    if entry.path.endswith(b".txt") and not entry.path.endswith(b".meta"):
-                        obj = repo[entry.sha]
-                        if isinstance(obj, Blob):
-                            files.append({
-                                "name": os.path.basename(entry.path.decode()),
-                                "path": entry.path.decode(),
-                                "sha": entry.sha.hex(),
-                                "mtime": 0,
-                            })
-        finally:
-            repo.close()
+        rc, out = _git('-C', repo_path, 'ls-tree', '-r', 'HEAD', '--name-only')
+        files = [
+            {"name": os.path.basename(n), "path": n, "mtime": 0}
+            for n in out.splitlines()
+            if n.endswith('.txt') and not n.endswith('.meta')
+        ] if rc == 0 else []
 
         # Sort control
         sort_mode = tk.StringVar(value="alpha")
@@ -888,30 +867,18 @@ class Editor:
             meta_path = file_io.meta_path(self._current_path)
             meta_rel = os.path.relpath(meta_path, self._repo_path).replace(os.sep, "/") if os.path.exists(meta_path) else None
 
-            _porcelain.add(self._repo_path, paths=[rel])
+            _git('-C', self._repo_path, 'add', '--', rel)
             if meta_rel:
-                _porcelain.add(self._repo_path, paths=[meta_rel])
+                _git('-C', self._repo_path, 'add', '--', meta_rel)
 
-            # Check if there are any staged or unstaged changes before committing
-            repo = Repo(self._repo_path)
-            try:
-                st = _porcelain.status(self._repo_path)
-                s = st.staged  # {'add': [], 'delete': [], 'modify': []}
-                has_changes = bool(s.get('add') or s.get('delete') or s.get('modify') or st.unstaged)
-            except Exception:
-                has_changes = True  # if status check fails, assume changed
-            finally:
-                repo.close()
-
-            if not has_changes:
+            rc, out = _git('-C', self._repo_path, 'status', '--porcelain')
+            if not out.strip():
                 return False  # nothing to commit
 
-            _porcelain.commit(
-                self._repo_path,
-                message=message.encode("utf-8"),
-                author=b"Poetit User <poetit@local>",
-            )
-            return True
+            rc, out = _git('-C', self._repo_path,
+                           '-c', 'user.name=Poetit User', '-c', 'user.email=poetit@local',
+                           'commit', '-m', message)
+            return rc == 0
         except Exception as exc:
             messagebox.showerror("Commit Error", f"Could not create version:\n{exc}")
             return False
@@ -939,35 +906,12 @@ class Editor:
 
     def _load_blob_at_path(self, commit_sha, rel_path):
         """Extract the content of a blob from a specific commit."""
-        if isinstance(commit_sha, str):
-            commit_sha = commit_sha.encode()
-        repo = Repo(self._repo_path)
-        try:
-            commit = repo[commit_sha]
-            tree = repo[commit.tree]
-            # Walk the tree to find the file
-            parts = rel_path.split("/")
-            current = tree
-            for part in parts[:-1]:
-                entry = None
-                for e in current.items():
-                    if e.path.decode() == part:
-                        entry = repo[e.sha]
-                        break
-                if entry is None:
-                    return None
-                current = entry
-            # Find the file
-            filename = parts[-1]
-            for e in current.items():
-                if e.path.decode() == filename:
-                    blob = repo[e.sha]
-                    return blob.data
-            return None
-        except Exception:
-            return None
-        finally:
-            repo.close()
+        sha = commit_sha.decode() if isinstance(commit_sha, bytes) else commit_sha
+        result = subprocess.run(
+            ['git', '-C', self._repo_path, 'show', f'{sha}:{rel_path}'],
+            capture_output=True,
+        )
+        return result.stdout if result.returncode == 0 else None
 
     def _load_text_into_editor(self, text):
         """Replace editor content with given text."""
@@ -1012,40 +956,43 @@ class Editor:
         popup.geometry("560x500")
 
         from datetime import datetime
-        repo = Repo(self._repo_path)
 
-        # Collect all commits with their trees
+        # Collect all commits: sha|parents|subject|author|unix-timestamp
+        rc, log_out = _git('-C', self._repo_path,
+                           'log', '--format=%H|%P|%s|%aN|%at', '--topo-order')
         commits = []
-        try:
-            head_sha = repo.head()
-        except KeyError:
-            head_sha = None
-
-        if head_sha:
-            try:
-                walker = repo.get_walker(head_sha)
-                for entry in walker:
-                    c = entry.commit
-                    # Collect file paths from the tree
-                    tree = repo[c.tree]
-                    files = []
-                    for e in tree.items():
-                        if e.path.endswith(b".txt") and not e.path.endswith(b".meta"):
-                            files.append(e.path.decode())
-                    commits.append({
-                        "sha": c.id.decode()[:8],
-                        "sha_full": c.id,
-                        "message": c.message.decode("utf-8", errors="replace").strip(),
-                        "author": c.author.decode("utf-8", errors="replace"),
-                        "time": datetime.fromtimestamp(c.commit_time).strftime("%Y-%m-%d %H:%M"),
-                        "parents": [p.decode()[:8] for p in c.parents],
-                        "files": files,
-                    })
-            except Exception as exc:
-                messagebox.showerror("Error", f"Could not read commits:\n{exc}")
-                repo.close()
-                return
-        repo.close()
+        if rc == 0:
+            for line in log_out.splitlines():
+                if not line.strip():
+                    continue
+                parts = line.split('|', 4)
+                if len(parts) < 5:
+                    continue
+                sha_full, parents_str, message, author, ts = parts
+                parents = [p[:8] for p in parents_str.split() if p]
+                rc2, tree_out = _git('-C', self._repo_path,
+                                     'ls-tree', '-r', sha_full, '--name-only')
+                files = [
+                    n for n in tree_out.splitlines()
+                    if n.endswith('.txt') and not n.endswith('.meta')
+                ] if rc2 == 0 else []
+                try:
+                    time_str = datetime.fromtimestamp(int(ts)).strftime("%Y-%m-%d %H:%M")
+                except (ValueError, OSError):
+                    time_str = ts
+                commits.append({
+                    "sha": sha_full[:8],
+                    "sha_full": sha_full,
+                    "message": message.strip(),
+                    "author": author,
+                    "time": time_str,
+                    "parents": parents,
+                    "files": files,
+                })
+        if rc != 0 and not commits:
+            messagebox.showerror("Error", "Could not read commits.")
+            popup.destroy()
+            return
 
         # Header bar — close button + poem name
         header = tk.Frame(popup, bg="#dde8ff", pady=4)
@@ -2782,13 +2729,10 @@ class Editor:
         if not self._confirm_discard():
             return
         repo_dir = _default_poems_dir()
-        try:
-            Repo(repo_dir).close()
+        if _is_git_repo(repo_dir):
             self._repo_path = repo_dir
             self._show_repo_browser(repo_dir)
             return
-        except _dulwich_errors.NotGitRepository:
-            pass
         path = filedialog.askopenfilename(
             filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
             initialdir=os.path.expanduser("~"),
@@ -2941,28 +2885,24 @@ class Editor:
     def _ensure_repo_for_import_export(self):
         """Ensure the fixed repo exists; offer to create it if not. Returns True if ready."""
         repo_dir = _default_poems_dir()
-        if getattr(self, "_repo_path", None) == repo_dir and os.path.exists(repo_dir):
+        if getattr(self, "_repo_path", None) == repo_dir and _is_git_repo(repo_dir):
             return True
-        try:
-            Repo(repo_dir).close()
+        if _is_git_repo(repo_dir):
             self._repo_path = repo_dir
             return True
-        except _dulwich_errors.NotGitRepository:
-            pass
         if not messagebox.askyesno(
             "No Repository",
             f"Import and Export require a repository.\n\n"
             f"Create one now at:\n{repo_dir}?",
         ):
             return False
-        try:
-            Repo.init(repo_dir)
-            _seed_demo_poem(repo_dir)
-            self._repo_path = repo_dir
-            return True
-        except Exception as exc:
-            messagebox.showerror("Error", f"Could not create repository:\n{exc}")
+        rc, out = _git('-C', repo_dir, 'init')
+        if rc != 0:
+            messagebox.showerror("Error", f"Could not create repository:\n{out}")
             return False
+        _seed_demo_poem(repo_dir)
+        self._repo_path = repo_dir
+        return True
 
 
 def _sentence_at_cursor(text, cursor_col):
