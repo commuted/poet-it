@@ -49,12 +49,12 @@ class TestImports:
 # ── Full pipeline (skipped when the English models are not on disk) ──────────
 
 @pytest.fixture(scope="module")
-def stanza_doc():
+def stanza_pipeline():
     if not STANZA_AVAILABLE:
         pytest.skip("stanza not installed")
     import stanza
     try:
-        nlp = stanza.Pipeline(
+        return stanza.Pipeline(
             'en',
             processors=Linguistics._STANZA_PROCESSORS,
             verbose=False,
@@ -62,7 +62,11 @@ def stanza_doc():
         )
     except Exception as exc:
         pytest.skip(f"stanza English models not available offline: {exc}")
-    return nlp(SAMPLE_TEXT)
+
+
+@pytest.fixture(scope="module")
+def stanza_doc(stanza_pipeline):
+    return stanza_pipeline(SAMPLE_TEXT)
 
 
 class TestPipelineSurface:
@@ -85,6 +89,38 @@ class TestPipelineSurface:
                 assert w.upos
                 assert w.deprel
                 assert w.lemma
+
+    def test_sentence_spans(self, stanza_doc):
+        """Sentence text + token char offsets drive diagram sentence selection
+        (app.py _sentence_index_at_offset)."""
+        for sent in stanza_doc.sentences:
+            assert isinstance(sent.text, str) and sent.text
+            assert isinstance(sent.tokens[0].start_char, int)
+            assert isinstance(sent.tokens[-1].end_char, int)
+        first, second = stanza_doc.sentences
+        assert first.tokens[0].start_char == 0
+        assert first.tokens[-1].end_char <= second.tokens[0].start_char
+
+    def test_diagram_sentence_selection(self, stanza_pipeline):
+        """Cursor-offset → sentence mapping used by the Diagram feature.
+
+        Covers the original bug (first sentence ending in '?' shadowed the
+        second) and a sentence spanning a line break.
+        """
+        from poetit.app import _sentence_index_at_offset
+
+        text = "Does the cat sleep? The dog barks."
+        doc = stanza_pipeline(text)
+        assert len(doc.sentences) == 2
+        assert _sentence_index_at_offset(doc, text.index("cat")) == 0
+        assert _sentence_index_at_offset(doc, text.index("dog")) == 1
+
+        poem = "The rain that falls\nnever stops. It sings."
+        doc = stanza_pipeline(poem)
+        assert len(doc.sentences) == 2
+        # "never" is on the second editor line but inside the first sentence
+        assert _sentence_index_at_offset(doc, poem.index("never")) == 0
+        assert _sentence_index_at_offset(doc, poem.index("sings")) == 1
 
     def test_linguistics_adapter(self, stanza_doc):
         """End-to-end through poetit's own accessor."""

@@ -157,15 +157,15 @@ def _arc_levels(words):
     return levels
 
 
-def _stanza_to_svg(doc, bg="#fffef0", color="#003388"):
-    """Render a Stanza doc's first sentence as a dependency arc diagram SVG."""
+def _stanza_to_svg(doc, bg="#fffef0", color="#003388", sent_index=0):
+    """Render one sentence of a Stanza doc as a dependency arc diagram SVG."""
     if not doc or not doc.sentences:
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="300" height="60"'
                 f' style="background:{bg}"><text x="10" y="35"'
                 f' font-family="sans-serif" font-size="13" fill="#555">'
                 f'No parse available.</text></svg>')
 
-    words = doc.sentences[0].words
+    words = doc.sentences[sent_index].words
     n = len(words)
 
     col_w        = 110   # horizontal pixels per word
@@ -257,8 +257,8 @@ def _stanza_to_svg(doc, bg="#fffef0", color="#003388"):
     )
 
 
-def show_diagram_popup(root, text, doc, screen_w, screen_h):
-    svg = _stanza_to_svg(doc)
+def show_diagram_popup(root, text, doc, screen_w, screen_h, sent_index=0):
+    svg = _stanza_to_svg(doc, sent_index=sent_index)
     png_bytes = _resvg.svg_to_bytes(svg_string=svg)
     img = _PILImage.open(_io.BytesIO(png_bytes))
 
@@ -274,7 +274,7 @@ def show_diagram_popup(root, text, doc, screen_w, screen_h):
     info_frame = tk.Frame(popup, bg="#eef2fb")
     info_frame.pack(fill=tk.X, padx=8, pady=(0, 4))
     if doc and doc.sentences:
-        for word in doc.sentences[0].words:
+        for word in doc.sentences[sent_index].words:
             if word.text.isalpha():
                 cell = tk.Frame(info_frame, bg="#eef2fb", padx=4)
                 cell.pack(side="left")

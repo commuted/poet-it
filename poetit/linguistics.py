@@ -375,7 +375,8 @@ class Linguistics:
 
     # The complete Stanza surface poetit consumes: this processor list, plus
     # doc.sentences[*].words[*] attributes text/id/head/xpos/upos/deprel/lemma
-    # (read here and in popups.py). scripts/trim_nlp_footprint.py and
+    # and doc.sentences[*] attributes text and tokens[*].start_char (read
+    # here, in app.py, and in popups.py). scripts/trim_nlp_footprint.py and
     # tests/test_stanza_smoke.py rely on this scope staying this narrow.
     _STANZA_PROCESSORS = 'tokenize,mwt,pos,lemma,depparse'
 

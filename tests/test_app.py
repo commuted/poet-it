@@ -166,3 +166,44 @@ class TestEnsureRowVisible:
         assert 0.0 <= top <= 1.0
         assert 0.0 <= bot <= 1.0
         assert top <= bot
+
+
+# ---------------------------------------------------------------------------
+# Diagram sentence selection (no display required)
+# ---------------------------------------------------------------------------
+
+class TestSentenceIndexAtOffset:
+    @staticmethod
+    def _doc(starts):
+        """Stub doc whose sentences start at the given character offsets."""
+        from types import SimpleNamespace as NS
+        from poetit.app import _sentence_index_at_offset  # noqa: F401
+        return NS(sentences=[NS(tokens=[NS(start_char=s)]) for s in starts])
+
+    def test_offset_inside_each_sentence(self):
+        from poetit.app import _sentence_index_at_offset
+        doc = self._doc([0, 20, 41])
+        assert _sentence_index_at_offset(doc, 5) == 0
+        assert _sentence_index_at_offset(doc, 25) == 1
+        assert _sentence_index_at_offset(doc, 60) == 2
+
+    def test_offset_in_gap_selects_preceding_sentence(self):
+        from poetit.app import _sentence_index_at_offset
+        doc = self._doc([0, 20])
+        assert _sentence_index_at_offset(doc, 19) == 0
+
+    def test_offset_at_sentence_start(self):
+        from poetit.app import _sentence_index_at_offset
+        doc = self._doc([0, 20])
+        assert _sentence_index_at_offset(doc, 20) == 1
+
+    def test_offset_before_first_sentence_falls_back_to_first(self):
+        from poetit.app import _sentence_index_at_offset
+        doc = self._doc([3, 20])
+        assert _sentence_index_at_offset(doc, 0) == 0
+
+    def test_empty_sentence_tokens_are_skipped(self):
+        from types import SimpleNamespace as NS
+        from poetit.app import _sentence_index_at_offset
+        doc = NS(sentences=[NS(tokens=[]), NS(tokens=[NS(start_char=0)])])
+        assert _sentence_index_at_offset(doc, 5) == 1

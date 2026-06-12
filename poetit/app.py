@@ -1312,10 +1312,19 @@ class Editor:
             cursor = te.index(tk.INSERT)
         except tk.TclError:
             cursor = self._last_focus_cursor
-        text = _sentence_at_cursor(raw, cursor).strip()
-        if not text:
-            messagebox.showinfo("Diagram", "The current line is empty.")
+        # Assemble the poem exactly as it is written to disk (trailing blank
+        # lines dropped, lines joined with newlines) and map the cursor to an
+        # absolute character offset in that text. Stanza segments the whole
+        # poem, so sentences may span line breaks.
+        content = [line.get() for line, _ in self.lines]
+        while content and not content[-1]:
+            content.pop()
+        text = "\n".join(content)
+        if not text.strip():
+            messagebox.showinfo("Diagram", "The poem is empty.")
             return
+        offset = sum(len(line) + 1 for line in content[:row]) \
+            + min(cursor, len(raw))
         if not _STANZA_AVAILABLE:
             messagebox.showerror(
                 "Diagram",
@@ -1335,7 +1344,7 @@ class Editor:
         doc = self._nlp.get_stanza_doc(text)
         if doc is None:
             if self._nlp.stanza_needs_download:
-                self._offer_stanza_download(text)
+                self._offer_stanza_download()
             else:
                 messagebox.showerror(
                     "Diagram",
@@ -1343,13 +1352,18 @@ class Editor:
                     "Check your internet connection and restart the application."
                 )
             return
+        if not doc.sentences:
+            messagebox.showinfo("Diagram", "No sentence found to diagram.")
+            return
+        sent_index = _sentence_index_at_offset(doc, offset)
         popups.show_diagram_popup(
-            self.root, text, doc,
+            self.root, doc.sentences[sent_index].text, doc,
             self.root.winfo_screenwidth(),
             self.root.winfo_screenheight(),
+            sent_index=sent_index,
         )
 
-    def _offer_stanza_download(self, text):
+    def _offer_stanza_download(self):
         if not messagebox.askyesno(
             "Download Model",
             "The Stanza English model hasn't been downloaded yet (~500 MB).\n\n"
@@ -2905,36 +2919,18 @@ class Editor:
         return True
 
 
-def _sentence_at_cursor(text, cursor_col):
-    """Return the sentence under the cursor when text contains multiple
-    period-space-delimited sentences; otherwise return text unchanged.
+def _sentence_index_at_offset(doc, offset):
+    """Index of the Stanza sentence containing the given character offset.
 
-    Splitting only triggers when '. ' (period + whitespace) appears inside the
-    string, meaning at least two sentences are present.  A single trailing
-    period (common in poetry) leaves the whole line intact.
+    Sentence spans come from the parse of the full poem text, so a cursor in
+    the whitespace between sentences (or past the last one) selects the last
+    sentence that starts at or before the offset.
     """
-    import re
-    segs = re.split(r'(?<=\.)\s+', text)
-    if len(segs) < 2:
-        return text
-
-    # Rebuild the character-start position of each segment so we can map the
-    # cursor column back to a segment index.
-    pos = 0
-    starts = []
-    for seg in segs:
-        starts.append(pos)
-        pos += len(seg)
-        # advance past the whitespace delimiter that was consumed by the split
-        while pos < len(text) and text[pos] in ' \t':
-            pos += 1
-
-    # Find the last segment whose start is at or before the cursor.
     idx = 0
-    for i, start in enumerate(starts):
-        if cursor_col >= start:
+    for i, sent in enumerate(doc.sentences):
+        if sent.tokens and sent.tokens[0].start_char <= offset:
             idx = i
-    return segs[idx].strip()
+    return idx
 
 
 def _load_icon(master=None):
