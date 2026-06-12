@@ -12,8 +12,6 @@ description: |
     - Thesaurus and WordNet definitions (bundled)
     - Dependency-parse diagrams via Stanza (Stanford NLP)
     - Git-based version control with commit history browser
-    - Spell check with inline suggestions
-    - Version control (dulwich git compatible repo)
 
   Poems are stored in ~/Documents/Poetit/.
   No Electron, no browser — pure Python desktop app.
@@ -32,12 +30,28 @@ parts:
   poetit:
     plugin: python
     source: .
+    # Pin torch to the CPU-only build: PyPI's torch is a CUDA build that adds
+    # ~4.5 GB poetit can never use. The pin only exists on the pytorch.org CPU
+    # index (PIP_EXTRA_INDEX_URL below). Keep the version in sync with
+    # flatpak/python3-torch-cpu.json.
     python-packages:
+      - torch==2.12.0+cpu
       - .
+    build-environment:
+      - PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
+    override-build: |
+      craftctl default
+      # Strip stanza/torch files poetit can never execute (headers, bundled
+      # binaries, test suites, type stubs) and verify the result still imports.
+      SITE_PACKAGES=$(ls -d "$CRAFT_PART_INSTALL"/lib/python3.*/site-packages)
+      python3 "$CRAFT_PART_BUILD"/scripts/trim_nlp_footprint.py \
+          --site-packages "$SITE_PACKAGES" --expect-cpu
+      "$CRAFT_PART_INSTALL"/bin/python3 -c "import torch; torch.zeros(2).sum(); import stanza.pipeline.core; import stanza.resources.common"
     stage-packages:
       - python3-tk
       - libpython3-stdlib
       - tk8.6-blt2.5
+      - git
 
 apps:
   poetit:

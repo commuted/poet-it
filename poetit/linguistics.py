@@ -373,6 +373,10 @@ class Linguistics:
     # Stanza
     # ------------------------------------------------------------------ #
 
+    # The complete Stanza surface poetit consumes: this processor list, plus
+    # doc.sentences[*].words[*] attributes text/id/head/xpos/upos/deprel/lemma
+    # (read here and in popups.py). scripts/trim_nlp_footprint.py and
+    # tests/test_stanza_smoke.py rely on this scope staying this narrow.
     _STANZA_PROCESSORS = 'tokenize,mwt,pos,lemma,depparse'
 
     @property
@@ -424,7 +428,7 @@ class Linguistics:
     def download_stanza_model(self):
         """Download the Stanza English model. Runs synchronously; call from a background thread."""
         try:
-            _stanza.download('en', verbose=False)
+            _stanza.download('en', processors=self._STANZA_PROCESSORS, verbose=False)
             with self._stanza_lock:
                 self._stanza_needs_download = False
             return True

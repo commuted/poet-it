@@ -2,13 +2,14 @@
 
 A desktop poetry editor with built-in syllable counting, meter analysis, rhyme detection, thesaurus, dictionary, dependency diagrams, and git-based version control. Built with Python and tkinter — no Electron, no browser. 
 
-This is working now but python dependencies are 6G because of the NLP, Pytorch and unused CUDA. Working on shrinking it. 
+Python dependencies are ~1.7 GB installed (mostly PyTorch's CPU inference library, used by Stanza for parsing). Install torch from the CPU index as shown below — the default PyPI torch is a CUDA build that adds ~4.5 GB poetit can never use.
 
 ---
 
 ## Install
 
 ```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only torch, ~4.5 GB smaller
 pip install -e .
 ```
 
@@ -16,14 +17,22 @@ For the full feature set install the optional extras:
 
 ```bash
 pip install stanza resvg_py Pillow
-python -c "import stanza; stanza.download('en')"
+python -c "import stanza; stanza.download('en', processors='tokenize,mwt,pos,lemma,depparse')"
+```
+
+To reclaim another ~60 MB, strip the parts of stanza/torch that poetit never
+executes (test suites, C++ headers, bundled binaries):
+
+```bash
+python3 scripts/trim_nlp_footprint.py --keep-pyi \
+    --site-packages "$(python -c 'import site; print(site.getsitepackages()[0])')"
 ```
 
 | Feature | Requires |
 |---|---|
 | Meter analysis (enhanced) | `prosodic` |
 | Dependency diagram | `stanza`, `resvg_py`, `Pillow` |
-| Version control | `dulwich` (included by default) |
+| Version control | `git` on PATH |
 
 NLTK data (punkt tokenizer, POS tagger) is downloaded automatically on first launch if not already present. CMUDict and WordNet are bundled with the package — no separate download needed.
 
@@ -102,7 +111,7 @@ Click on a line then click **Diagram** to render a Stanza dependency parse of th
 
 ## Version control
 
-Poetit uses git (via `dulwich`) to keep a history of every version of your poem. No git installation required — dulwich is a pure-Python git implementation.
+Poetit uses git to keep a history of every version of your poem. It calls the `git` command-line tool, so git must be installed and on PATH.
 
 ### First launch
 

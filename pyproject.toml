@@ -36,7 +36,6 @@ dependencies = [
     "nltk>=3.8",
     "prosodic>=3.0",
     "stanza>=1.7",
-    "transformers>=4.0",
     "resvg_py>=0.3",
     "Pillow>=9.0",
     "pyspellchecker>=0.7",

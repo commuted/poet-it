@@ -525,16 +525,6 @@
                 },
                 {
                     "type": "file",
-                    "url": "https://files.pythonhosted.org/packages/11/c8/26f2e4aae92f11522a96043892ba39a90eac610d5242523aa863212bc1c7/cuda_pathfinder-1.5.5-py3-none-any.whl",
-                    "sha256": "0228c023f95d1480f143ef5c8922d27a2ab052087a942e81dc289c9eb8f91689"
-                },
-                {
-                    "type": "file",
-                    "url": "https://files.pythonhosted.org/packages/57/b2/453099f5f3b698d7d0eab38916aac44c7f76229f451709e2eb9db6615dcd/cuda_toolkit-13.0.2-py2.py3-none-any.whl",
-                    "sha256": "b198824cf2f54003f50d64ada3a0f184b42ca0846c1c94192fa269ecd97a66eb"
-                },
-                {
-                    "type": "file",
                     "url": "https://files.pythonhosted.org/packages/e1/5e/4b5aaaabddfacfe36ba7768817bd1f71a7a810a43705e531f3ae4c690767/emoji-2.15.0-py3-none-any.whl",
                     "sha256": "205296793d66a89d88af4688fa57fd6496732eb48917a87175a023c8138995eb"
                 },
