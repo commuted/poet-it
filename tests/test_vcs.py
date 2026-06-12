@@ -1,4 +1,12 @@
-"""Tests for the subprocess-git VCS layer that replaced dulwich."""
+"""Tests for the dulwich-based VCS layer.
+
+The app writes history with dulwich (pure Python — no git binary needed at
+runtime). These tests verify that behaviour, using the real git CLI as an
+independent reader: every assertion made through `git log` / `git show` also
+proves the dulwich-written repository is plain git underneath. The git CLI
+is a test-only dependency; the module is skipped where it is unavailable.
+"""
+import shutil
 import subprocess
 import tkinter as tk
 
@@ -8,20 +16,32 @@ from poetit.app import (
     Editor,
     _DEMO_POEM,
     _DEMO_POEM_NAME,
-    _git,
-    _is_git_repo,
     _seed_demo_poem,
 )
 from poetit.linguistics import Linguistics
+
+dulwich = pytest.importorskip("dulwich")
+from dulwich.repo import Repo  # noqa: E402
+
+pytestmark = pytest.mark.skipif(
+    shutil.which("git") is None,
+    reason="git CLI needed to independently verify dulwich-written history",
+)
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
+def _git(*args, cwd=None):
+    """Test-only helper: run git, return (returncode, decoded stdout)."""
+    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True)
+    return r.returncode, r.stdout.decode("utf-8", errors="replace")
+
+
 def _init_repo(path):
-    """Initialise a bare git repo at path and return it."""
-    subprocess.run(['git', 'init', str(path)], capture_output=True, check=True)
+    """Initialise a repo at path with dulwich (as the app does) and return it."""
+    Repo.init(str(path)).close()
     return path
 
 
@@ -71,48 +91,23 @@ def _set_editor_line(ed, row, text):
 
 
 # ---------------------------------------------------------------------------
-# _git()
+# dulwich ↔ git interoperability
 # ---------------------------------------------------------------------------
 
-class TestGitHelper:
-    def test_successful_command_returns_zero_rc(self, tmp_path):
-        rc, _ = _git('-C', str(tmp_path), 'init')
+class TestGitInterop:
+    def test_dulwich_init_recognised_by_git(self, repo):
+        rc, _ = _git('-C', str(repo), 'rev-parse', '--git-dir')
         assert rc == 0
 
-    def test_failing_command_returns_nonzero_rc(self, tmp_path):
-        # rev-parse on a non-repo directory fails
-        rc, _ = _git('-C', str(tmp_path), 'rev-parse', '--git-dir')
-        assert rc != 0
+    def test_git_init_recognised_by_dulwich(self, tmp_path):
+        subprocess.run(['git', 'init', str(tmp_path)],
+                       capture_output=True, check=True)
+        Repo(str(tmp_path)).close()  # raises NotGitRepository on failure
 
-    def test_stdout_is_decoded_string(self, repo):
-        rc, out = _git('-C', str(repo), 'rev-parse', '--git-dir')
-        assert rc == 0
-        assert isinstance(out, str)
-
-    def test_cwd_kwarg_sets_working_directory(self, repo):
-        rc, _ = _git('rev-parse', '--git-dir', cwd=str(repo))
-        assert rc == 0
-
-    def test_output_matches_git_output(self, repo):
-        _commit_file(repo, 'a.txt', 'hello')
-        rc, out = _git('-C', str(repo), 'log', '--format=%s')
-        assert rc == 0
-        assert 'add a.txt' in out
-
-
-# ---------------------------------------------------------------------------
-# _is_git_repo()
-# ---------------------------------------------------------------------------
-
-class TestIsGitRepo:
-    def test_true_for_initialised_repo(self, repo):
-        assert _is_git_repo(str(repo)) is True
-
-    def test_false_for_plain_directory(self, tmp_path):
-        assert _is_git_repo(str(tmp_path)) is False
-
-    def test_false_for_nonexistent_path(self, tmp_path):
-        assert _is_git_repo(str(tmp_path / 'no_such_dir')) is False
+    def test_plain_directory_is_not_a_repo(self, tmp_path):
+        from dulwich.errors import NotGitRepository
+        with pytest.raises(NotGitRepository):
+            Repo(str(tmp_path))
 
 
 # ---------------------------------------------------------------------------
@@ -273,39 +268,3 @@ class TestLoadBlobAtPath:
         data = ed._load_blob_at_path(sha, 'poem.txt')
         ed._repo_path = saved
         assert data == 'café naïve résumé\n'.encode('utf-8')
-
-
-# ---------------------------------------------------------------------------
-# git ls-tree used by _show_repo_browser
-# ---------------------------------------------------------------------------
-
-class TestLsTree:
-    """Verify the git ls-tree invocation that replaced dulwich's tree walk."""
-
-    def test_txt_files_listed(self, repo):
-        _commit_file(repo, 'sonnet.txt', 'content')
-        rc, out = _git('-C', str(repo), 'ls-tree', '-r', 'HEAD', '--name-only')
-        names = [n for n in out.splitlines() if n.endswith('.txt') and not n.endswith('.meta')]
-        assert rc == 0
-        assert 'sonnet.txt' in names
-
-    def test_meta_files_excluded_by_filter(self, repo):
-        _commit_file(repo, 'poem.txt', 'content')
-        _commit_file(repo, 'poem.txt.meta', '{}')
-        _, out = _git('-C', str(repo), 'ls-tree', '-r', 'HEAD', '--name-only')
-        names = [n for n in out.splitlines() if n.endswith('.txt') and not n.endswith('.meta')]
-        assert 'poem.txt' in names
-        assert 'poem.txt.meta' not in names
-
-    def test_returns_nonzero_on_empty_repo(self, repo):
-        # HEAD doesn't exist before first commit
-        rc, _ = _git('-C', str(repo), 'ls-tree', '-r', 'HEAD', '--name-only')
-        assert rc != 0
-
-    def test_multiple_poems_all_listed(self, repo):
-        _commit_file(repo, 'one.txt', 'a')
-        _commit_file(repo, 'two.txt', 'b')
-        _, out = _git('-C', str(repo), 'ls-tree', '-r', 'HEAD', '--name-only')
-        names = [n for n in out.splitlines() if n.endswith('.txt') and not n.endswith('.meta')]
-        assert 'one.txt' in names
-        assert 'two.txt' in names

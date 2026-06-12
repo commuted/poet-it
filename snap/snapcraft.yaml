@@ -51,7 +51,6 @@ parts:
       - python3-tk
       - libpython3-stdlib
       - tk8.6-blt2.5
-      - git
 
 apps:
   poetit:

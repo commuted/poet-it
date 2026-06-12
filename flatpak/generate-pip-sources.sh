@@ -15,9 +15,16 @@
 # removes the leftover pure-python cuda_* stub wheels (never installed, since
 # torch+cpu does not depend on them) and fails if a torch wheel ever shows up
 # in the generated output (it would shadow the CPU build).
+#
+# The generator exits non-zero ("Unresolved dependencies") because of those
+# skipped platform wheels even when the output is complete, so its exit code
+# is ignored; deleting the old output first ensures the post-processing step
+# fails loudly if no fresh file was actually written.
 set -e
 cd "$(dirname "$0")"
-python3 -m flatpak_pip_generator -r requirements.txt -o python3-requirements.json
+rm -f python3-requirements.json
+python3 -m flatpak_pip_generator -r requirements.txt -o python3-requirements.json \
+    || echo "generator exited non-zero (expected for skipped torch/nvidia platform wheels)"
 
 python3 - <<'EOF'
 import json, sys

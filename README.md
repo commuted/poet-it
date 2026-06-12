@@ -32,7 +32,7 @@ python3 scripts/trim_nlp_footprint.py --keep-pyi \
 |---|---|
 | Meter analysis (enhanced) | `prosodic` |
 | Dependency diagram | `stanza`, `resvg_py`, `Pillow` |
-| Version control | `git` on PATH |
+| Version control | `dulwich` (included by default) |
 
 NLTK data (punkt tokenizer, POS tagger) is downloaded automatically on first launch if not already present. CMUDict and WordNet are bundled with the package — no separate download needed.
 
@@ -111,7 +111,7 @@ Click on a line then click **Diagram** to render a Stanza dependency parse of th
 
 ## Version control
 
-Poetit uses git to keep a history of every version of your poem. It calls the `git` command-line tool, so git must be installed and on PATH.
+Poetit uses git (via `dulwich`) to keep a history of every version of your poem. No git installation required — dulwich is a pure-Python git implementation, so version history works identically in the flatpak, snap, and on Windows.
 
 ### First launch
 

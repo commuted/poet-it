@@ -59,6 +59,12 @@ DENY_LIST = [
     ("stanza/utils/datasets/sentiment", REQUIRED),
     ("stanza/utils/datasets/tokenization", REQUIRED),
     ("stanza/utils/datasets/vietnamese", OPTIONAL),
+    # ── dulwich: test suite, GCS backend, CLI entry point ──
+    # (porcelain lazily imports many sibling modules per command, so only
+    # whole subpackages and the standalone CLI are safe to remove)
+    ("dulwich/tests", REQUIRED),
+    ("dulwich/cloud", REQUIRED),
+    ("dulwich/cli.py", OPTIONAL),
     # ── torch: non-code assets only ──
     ("torch/include", REQUIRED),         # C++ headers (extension builds only)
     ("torch/share", OPTIONAL),           # cmake config
@@ -136,9 +142,10 @@ def main():
     args = ap.parse_args()
 
     sp = os.path.abspath(args.site_packages)
-    if not os.path.isdir(os.path.join(sp, "stanza")) or \
-       not os.path.isdir(os.path.join(sp, "torch")):
-        sys.exit(f"error: {sp} does not contain both stanza/ and torch/")
+    missing = [p for p in ("stanza", "torch", "dulwich")
+               if not os.path.isdir(os.path.join(sp, p))]
+    if missing:
+        sys.exit(f"error: {sp} does not contain: {', '.join(missing)}")
 
     if args.expect_cpu:
         offenders = []
