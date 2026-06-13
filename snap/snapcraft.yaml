@@ -1,5 +1,5 @@
 name: poetit
-version: '0.1.0'
+adopt-info: poetit   # version is pulled from pyproject.toml by the poetit part
 summary: Desktop poetry editor with meter, rhyme, thesaurus, and version control
 description: |
   Poetit is a line-by-line poetry editor built with Python and tkinter.
@@ -39,6 +39,10 @@ parts:
       - .
     build-environment:
       - PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
+    override-pull: |
+      craftctl default
+      # Single source of truth for the version: pyproject.toml [project].version
+      craftctl set version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
     override-build: |
       craftctl default
       # Strip stanza/torch files poetit can never execute (headers, bundled
@@ -57,24 +61,16 @@ apps:
     command: bin/poetit-launch
     extensions: [gnome]
     plugs:
-      - personal-files
+      # The app resolves every path through os.path.expanduser("~"), which under
+      # strict confinement is the snap-private home ($SNAP_USER_DATA). So the
+      # repo (~/Documents/Poetit), state (~/.poetit) and model caches
+      # (~/stanza_resources, ~/nltk_data) all live inside the sandbox and need
+      # no interface. `home` is here purely so the Import/Export/Open file
+      # dialogs can reach the user's real, non-hidden home files.
+      - home
       - network          # Stanza downloads its English model on first use
       - desktop
       - desktop-legacy
       - wayland
       - x11
       - opengl
-
-plugs:
-  personal-files:
-    interface: personal-files
-    read:
-      - $HOME/Documents/Poetit
-      - $HOME/.poetit
-      - $HOME/stanza_resources
-      - $HOME/nltk_data
-    write:
-      - $HOME/Documents/Poetit
-      - $HOME/.poetit
-      - $HOME/stanza_resources
-      - $HOME/nltk_data

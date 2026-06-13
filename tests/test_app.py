@@ -1,7 +1,6 @@
 """Tests for Editor-level behaviour introduced with the spell-check toggle
 and auto-scroll features.  These tests require a display server (tkinter).
 """
-import os
 import pytest
 import tkinter as tk
 

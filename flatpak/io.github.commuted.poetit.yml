@@ -8,10 +8,18 @@ finish-args:
   - --share=ipc
   - --socket=fallback-x11
   - --socket=wayland
-  - --filesystem=home
-  - --share=network          # stanza/spaCy models download on first launch
+  # Narrow, reviewer-friendly scope: only the dirs the app actually uses, each
+  # created on first launch. The app reaches everything through
+  # os.path.expanduser("~"), which is the real home under flatpak.
+  - --filesystem=~/Documents/Poetit:create   # poem repository
+  - --filesystem=~/.poetit:create            # app state / themes
+  - --filesystem=~/nltk_data:create          # NLTK data cache
+  - --filesystem=~/stanza_resources:create   # Stanza model cache
+  - --share=network          # Stanza downloads its English model on first launch
   - --device=dri
-  - --env=PYTHONPATH=/app/lib/python3.12/site-packages
+  # Points at a build-time symlink (created in the poetit module) rather than a
+  # hardcoded python3.XX dir, so this survives a runtime Python minor bump.
+  - --env=PYTHONPATH=/app/lib/python3-site
 
 modules:
   # CPU-only torch must install first: it satisfies stanza's torch>=1.13
@@ -31,13 +39,18 @@ modules:
           /app/share/icons/hicolor/256x256/apps/io.github.commuted.poetit.png
       - install -Dm644 flatpak/io.github.commuted.poetit.desktop
           /app/share/applications/io.github.commuted.poetit.desktop
-      # Strip stanza/torch files poetit can never execute (headers, bundled
-      # binaries, test suites, type stubs) and verify the result still imports.
-      - python3 scripts/trim_nlp_footprint.py
-          --site-packages=${FLATPAK_DEST}/lib/python3.12/site-packages
-          --expect-cpu
-      - PYTHONPATH=${FLATPAK_DEST}/lib/python3.12/site-packages python3 -c
-          "import torch; torch.zeros(2).sum(); import stanza.pipeline.core; import stanza.resources.common"
+      - install -Dm644 flatpak/io.github.commuted.poetit.metainfo.xml
+          /app/share/metainfo/io.github.commuted.poetit.metainfo.xml
+      # Derive the site-packages dir from whatever Python the runtime ships
+      # (never hardcode python3.XX): strip stanza/torch files poetit can never
+      # execute, verify the result still imports, then publish a stable
+      # version-independent symlink for the runtime PYTHONPATH (see finish-args).
+      - |
+        set -e
+        SITE=$(echo ${FLATPAK_DEST}/lib/python3.*/site-packages)
+        python3 scripts/trim_nlp_footprint.py --site-packages="$SITE" --expect-cpu
+        PYTHONPATH="$SITE" python3 -c "import torch; torch.zeros(2).sum(); import stanza.pipeline.core; import stanza.resources.common"
+        ln -snf "$SITE" ${FLATPAK_DEST}/lib/python3-site
     sources:
       # For local builds use: type: dir, path: ..
       # For Flathub replace with a git tag + commit:

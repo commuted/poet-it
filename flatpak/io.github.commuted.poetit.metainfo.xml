@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.commuted.Poetit</id>
+  <id>io.github.commuted.poetit</id>
   <name>Poetit</name>
   <summary>Poetry editor with meter, rhyme, thesaurus, and version control</summary>
   <metadata_license>MIT</metadata_license>
   <project_license>MIT</project_license>
+
+  <developer id="io.github.commuted">
+    <name>Ron Hinchley</name>
+  </developer>
+  <update_contact>commuted_AT_gmail.com</update_contact>
+
+  <launchable type="desktop-id">io.github.commuted.poetit.desktop</launchable>
 
   <description>
     <p>

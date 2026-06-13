@@ -70,5 +70,10 @@ include = ["poetit", "poetit.*"]
     "data/corpora/*.zip",
 ]
 
+[tool.ruff.lint]
+# E701 (multiple statements on one line): the column-aligned if/elif/else
+# one-liners in linguistics.py and popups.py are intentional for readability.
+ignore = ["E701"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

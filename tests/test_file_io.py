@@ -1,7 +1,3 @@
-import json
-import os
-import pytest
-import tempfile
 
 from poetit import file_io
 

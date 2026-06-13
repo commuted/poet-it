@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import tempfile
 import threading
 import tkinter as tk
@@ -106,6 +105,85 @@ _FONT_CANDIDATES = [
     "Times", "Times New Roman", "Georgia",
     "DejaVu Serif", "FreeSerif", "Liberation Serif", "Noto Serif", "Palatino",
 ]
+
+HOMEPAGE_URL = "https://github.com/commuted/poetit"
+ISSUES_URL   = "https://github.com/commuted/poetit/issues"
+README_URL   = "https://github.com/commuted/poetit#readme"
+
+_CONCISE_HELP = """\
+Poetit — Quick Reference
+
+Toolbar
+  Meter        Show stress-marked meter beneath each line
+  Rhyme        Rhymes for the word at the cursor (or type one in the field)
+  Definition   WordNet definitions for the word at the cursor
+  Diagram      Dependency-parse diagram of the current sentence
+  Thesaurus    Synonyms for the word at the cursor
+  Spell        Toggle inline spell-check (hover a red mark for suggestions)
+  Make Version / Version Tree   Commit or browse past versions of a poem
+
+Editing
+  Enter              Split the line at the cursor
+  Up / Down          Move between lines
+  Shift+Up / Down    Select whole lines (then Cut/Copy)
+  Right at line end  Adds a trailing space, for free-form layout
+
+Poems are stored in ~/Documents/Poetit and tracked with Git.
+"""
+
+_LONG_HELP = """\
+POETIT — HELP
+
+Overview
+--------
+Poetit is a line-by-line poetry editor. Each line of your poem is its own
+field, with a live syllable count in the right margin and a rhyme-scheme
+letter beside it. Poems are kept in a Git repository at ~/Documents/Poetit,
+so every saved version is recoverable.
+
+The toolbar
+-----------
+Meter      Toggles a stress-marked rendering under every line. Capitals mark
+           stressed syllables; a centre dot separates syllables. Analysis runs
+           in the background (prosodic where available, NLTK as a fallback).
+
+Rhyme      Looks up rhymes for the word at the cursor and lets you insert one
+           into the line. With no line focused, type a word in the field beside
+           the button and press Enter to look up rhymes for display.
+
+Definition WordNet definitions for the word at the cursor, grouped by part of
+           speech, with synonyms and example sentences.
+
+Diagram    Draws a dependency-parse diagram of the sentence at the cursor,
+           using Stanza. The English model (~500 MB) downloads on first use.
+
+Thesaurus  Synonyms for the word at the cursor; click one to replace the word.
+
+Spell      Toggles inline spell-checking. Misspelled words get a red underline;
+           hover one to see suggestions and click to apply.
+
+Versions
+--------
+Make Version  Commits the current poem to the repository with a message
+              (pre-filled with a timestamp). Save first if the poem is new.
+
+Version Tree  Shows every committed version of the current poem. Click one to
+              load it; you are prompted to commit or discard any unsaved edits.
+
+Files
+-----
+New / Open / Save / Save As behave as usual. Browse Repository lists the poems
+already in ~/Documents/Poetit. Import copies an outside .txt file into the
+repository; Export writes the current poem back out to a chosen location.
+
+Appearance
+----------
+The Font, Size and Theme menus change the editor's look. Themes can be edited
+or created from Theme > Edit Themes…, and your choice is remembered.
+
+Support
+-------
+Questions and bug reports: """ + ISSUES_URL + "\n"
 
 
 
@@ -727,11 +805,16 @@ class Editor:
                     if entry.path.endswith(b".txt") and not entry.path.endswith(b".meta"):
                         obj = repo[entry.sha]
                         if isinstance(obj, Blob):
+                            rel = entry.path.decode()
+                            try:
+                                mtime = os.path.getmtime(os.path.join(repo_path, rel))
+                            except OSError:
+                                mtime = 0.0
                             files.append({
-                                "name": os.path.basename(entry.path.decode()),
-                                "path": entry.path.decode(),
+                                "name": os.path.basename(rel),
+                                "path": rel,
                                 "sha": entry.sha.hex(),
-                                "mtime": 0,
+                                "mtime": mtime,
                             })
         finally:
             repo.close()
@@ -759,7 +842,10 @@ class Editor:
             for w in listbox.winfo_children():
                 w.destroy()
             mode = sort_mode.get()
-            sorted_files = sorted(files, key=lambda f: f["name"] if mode == "alpha" else f["mtime"])
+            if mode == "alpha":
+                sorted_files = sorted(files, key=lambda f: f["name"].lower())
+            else:   # chronological — most recently modified first
+                sorted_files = sorted(files, key=lambda f: f["mtime"], reverse=True)
             for fi in sorted_files:
                 item_frame = tk.Frame(listbox, bg="white")
                 item_frame.pack(fill="x", padx=2, pady=1)
@@ -1716,7 +1802,7 @@ class Editor:
         help_menu = tk.Menu(menu, tearoff=0)
         help_menu.add_command(label="Long Help",    command=self._help_long)
         help_menu.add_command(label="Concise Help", command=self._help_concise)
-        help_menu.add_command(label="Help PDF",     command=self._help_pdf)
+        help_menu.add_command(label="Online Help",  command=self._help_pdf)
         help_menu.add_command(label="Support",      command=self._help_support)
         menu.add_command(label="    ", state="disabled")
         menu.add_command(label="    ", state="disabled")
@@ -1804,11 +1890,12 @@ class Editor:
 
         self.root.update_idletasks()
 
-    def _add_row(self, text=""):
-        row  = len(self.lines)
-        spec = self._font_spec()
-        fname, fsize = spec
+    def _make_row_widgets(self, text=""):
+        """Create the (text, margin, rhyme) widgets for one row.
 
+        Returns them ungridded and unbound — callers place and wire them.
+        """
+        spec = self._font_spec()
         te = _LineText(
             self.inner, font=spec, relief="flat", bd=0,
             bg=self._theme_bg, highlightthickness=0, insertbackground=self._theme_fg,
@@ -1819,20 +1906,18 @@ class Editor:
             width=MARGIN_CHARS, justify="center",
             state="readonly", readonlybackground="#e8e8e8",
         )
-        if text:
-            te.insert(0, text)
-
         rc = tk.Entry(
             self.inner, font=spec, relief="flat", bd=0,
             bg="#dde8dd", highlightthickness=0,
             width=1, justify="center",
             state="readonly", readonlybackground="#dde8dd",
         )
+        if text:
+            te.insert(0, text)
+        return te, me, rc
 
-        te.grid(row=row, column=0, sticky="ew")
-        me.grid(row=row, column=1, sticky="ew")
-        rc.grid(row=row, column=2, sticky="ew")
-
+    def _bind_row_events(self, te):
+        """Attach the full keyboard/mouse binding set to a row's text widget."""
         def _kp(e):
             if e.keysym in ("Up", "Down") and (e.state & 0x1):
                 r = self._row_of(e.widget)
@@ -1872,6 +1957,23 @@ class Editor:
         self._bind_row(te, "<Shift-Down>", self._shift_down)
         self._bind_row(te, "<Button-1>",   self._on_click)
 
+    def _spell_attach(self, te):
+        """When spell mode is on, scan, underline and hover-bind a row widget."""
+        if self._spell_var.get():
+            self._spell_scan_row(te)
+            self._spell_create_underline(te)
+            te.bind('<Motion>', lambda e, t=te: self._spell_on_motion(t, e))
+
+    def _add_row(self, text=""):
+        row = len(self.lines)
+        fname, fsize = self._font_spec()
+
+        te, me, rc = self._make_row_widgets(text)
+        te.grid(row=row, column=0, sticky="ew")
+        me.grid(row=row, column=1, sticky="ew")
+        rc.grid(row=row, column=2, sticky="ew")
+        self._bind_row_events(te)
+
         self._line_meta.append(
             [{"font": fname, "size": fsize, "len": len(text)}] if text else []
         )
@@ -1879,38 +1981,15 @@ class Editor:
         self.lines.append((te, me))
         if text:
             self._update_margin(row)
-        if self._spell_var.get():
-            self._spell_scan_row(te)
-            self._spell_create_underline(te)
-            te.bind('<Motion>', lambda e, t=te: self._spell_on_motion(t, e))
+        self._spell_attach(te)
 
     def _insert_row(self, row, text=""):
         """Insert a new line at the specified row index."""
         if row > len(self.lines):
             row = len(self.lines)
 
-        spec = self._font_spec()
-        fname, fsize = spec
-
-        te = _LineText(
-            self.inner, font=spec, relief="flat", bd=0,
-            bg=self._theme_bg, highlightthickness=0, insertbackground=self._theme_fg,
-        )
-        me = tk.Entry(
-            self.inner, font=spec, relief="flat", bd=0,
-            bg="#e8e8e8", highlightthickness=0,
-            width=MARGIN_CHARS, justify="center",
-            state="readonly", readonlybackground="#e8e8e8",
-        )
-        if text:
-            te.insert(0, text)
-
-        rc = tk.Entry(
-            self.inner, font=spec, relief="flat", bd=0,
-            bg="#dde8dd", highlightthickness=0,
-            width=1, justify="center",
-            state="readonly", readonlybackground="#dde8dd",
-        )
+        fname, fsize = self._font_spec()
+        te, me, rc = self._make_row_widgets(text)
 
         self.lines.insert(row, (te, me))
         self._rhyme_cells.insert(row, rc)
@@ -1938,49 +2017,8 @@ class Editor:
             if i < len(self._rhyme_cells):
                 self._rhyme_cells[i].grid(row=i, column=2, sticky="ew")
 
-        def _kp(e):
-            if e.keysym in ("Up", "Down") and (e.state & 0x1):
-                r = self._row_of(e.widget)
-                if r is None:
-                    return "break"
-                if e.keysym == "Up":
-                    self._shift_up(r)
-                else:
-                    self._shift_down(r)
-                return "break"
-            return None
-        te.bind("<KeyPress>", _kp)
-        # Also bind specific keys to ensure they fire on all platforms.
-        te.bind("<Shift-KeyPress-Up>", lambda e: self._shift_up(self._row_of(e.widget)) or "break")
-        te.bind("<Shift-KeyPress-Down>", lambda e: self._shift_down(self._row_of(e.widget)) or "break")
-
-        self._bind_row(te, "<KeyRelease>", self._on_key)
-        self._bind_row(te, "<Return>",     self._next)
-        self._bind_row(te, "<BackSpace>",  self._backspace)
-        te.bind("<Down>",  lambda e: self._down_virtual(e))
-        te.bind("<Up>",    lambda e: self._up_virtual(e))
-        te.bind("<Right>", lambda e: self._right_virtual(e))
-        te.bind("<Left>",  lambda e: self._left_virtual(e))
-        self._bind_row(te, "<Tab>",        self._go, offset=1)
-        self._bind_row(te, "<FocusIn>",    self._on_focus_in)
-        self._bind_row(te, "<FocusOut>",   self._on_focus_out)
-        self._bind_row(te, "<<Paste>>",    self._paste)
-        self._bind_row(te, "<Control-c>",  self._copy)
-        self._bind_row(te, "<Control-C>",  self._copy)
-        self._bind_row(te, "<Command-c>",  self._copy)
-        self._bind_row(te, "<Command-C>",  self._copy)
-        self._bind_row(te, "<Control-x>",  self._cut)
-        self._bind_row(te, "<Control-X>",  self._cut)
-        self._bind_row(te, "<Command-x>",  self._cut)
-        self._bind_row(te, "<Command-X>",  self._cut)
-        self._bind_row(te, "<Shift-Up>",   self._shift_up)
-        self._bind_row(te, "<Shift-Down>", self._shift_down)
-        self._bind_row(te, "<Button-1>",   self._on_click)
-
-        if self._spell_var.get():
-            self._spell_scan_row(te)
-            self._spell_create_underline(te)
-            te.bind('<Motion>', lambda e, t=te: self._spell_on_motion(t, e))
+        self._bind_row_events(te)
+        self._spell_attach(te)
 
     def _on_key(self, row):
         self._mark_dirty()
@@ -2502,17 +2540,42 @@ class Editor:
     # Help
     # ------------------------------------------------------------------ #
 
+    def _show_help_window(self, title, body):
+        """Display read-only multi-line help text in a scrollable window."""
+        popup = tk.Toplevel(self.root)
+        popup.title(title)
+        popup.transient(self.root)
+
+        frame = tk.Frame(popup)
+        frame.pack(fill="both", expand=True, padx=10, pady=8)
+        txt = tk.Text(
+            frame, wrap="word", font=("TkDefaultFont", 10),
+            width=74, height=30, relief="flat", padx=8, pady=6,
+        )
+        sb = tk.Scrollbar(frame, orient="vertical", command=txt.yview)
+        txt.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        txt.pack(side="left", fill="both", expand=True)
+        txt.insert("1.0", body)
+        txt.configure(state="disabled")
+
+        tk.Button(popup, text="Close", command=popup.destroy).pack(pady=(0, 10))
+
     def _help_long(self):
-        messagebox.showinfo("Long Help", "Long Help — not yet implemented.")
+        self._show_help_window("Poetit Help", _LONG_HELP)
 
     def _help_concise(self):
-        messagebox.showinfo("Concise Help", "Concise Help — not yet implemented.")
+        messagebox.showinfo("Concise Help", _CONCISE_HELP)
 
     def _help_pdf(self):
-        messagebox.showinfo("Help PDF", "Help PDF — not yet implemented.")
+        """Open the online README (no PDF ships with the app)."""
+        import webbrowser
+        webbrowser.open(README_URL)
 
     def _help_support(self):
-        messagebox.showinfo("Support", "Support — not yet implemented.")
+        """Open the project's issue tracker for support."""
+        import webbrowser
+        webbrowser.open(ISSUES_URL)
 
     # ------------------------------------------------------------------ #
     # Theme
@@ -3013,7 +3076,9 @@ def setup_linux_desktop():
 
     Run this once after pip install:  poetit-install-desktop
     """
-    import shutil, subprocess, sys
+    import shutil
+    import subprocess
+    import sys
     if sys.platform != "linux":
         print("This command is only needed on Linux.")
         return
