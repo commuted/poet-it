@@ -16,8 +16,8 @@ a = Analysis(
     pathex=[str(ROOT)],
     binaries=[],
     datas=[
+        # about.txt now lives in poetit/data and ships with the line below.
         (str(ROOT / 'poetit' / 'data'),  'poetit/data'),
-        (str(ROOT / 'about.txt'),         '.'),
         (str(ROOT / 'qr-code.png'),       '.'),
         (str(ROOT / 'LICENSE'),           '.'),
         (str(ROOT / 'NOTICE'),            '.'),
