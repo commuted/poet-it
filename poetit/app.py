@@ -13,7 +13,6 @@ from poetit.popups import DIAGRAM_AVAILABLE as _DIAGRAM_AVAILABLE
 
 try:
     from dulwich.repo import Repo
-    from dulwich.objects import Blob
     from dulwich import porcelain as _porcelain
     import dulwich.errors as _dulwich_errors
     _VCS_AVAILABLE = True
@@ -914,34 +913,26 @@ class Editor:
         popup.transient(self.root)
         popup.geometry("500x400")
 
-        repo = Repo(repo_path)
+        # List poems from the repository's working directory rather than the
+        # latest commit, so a poem just written by "Save in Repository" (not
+        # necessarily committed yet) is still discoverable. _open_file_from_repo
+        # loads by path from disk, so the on-disk listing is what matters.
+        files = []
         try:
+            names = os.listdir(repo_path)
+        except OSError:
+            names = []
+        for name in names:
+            if not name.endswith(".txt"):   # *.txt.meta ends with .meta, so excluded
+                continue
+            full = os.path.join(repo_path, name)
+            if not os.path.isfile(full):
+                continue
             try:
-                head = repo.head()
-                tree = repo[repo[head].tree]
-            except Exception:
-                head = None
-                tree = None
-
-            files = []
-            if tree is not None:
-                for entry in tree.items():
-                    if entry.path.endswith(b".txt") and not entry.path.endswith(b".meta"):
-                        obj = repo[entry.sha]
-                        if isinstance(obj, Blob):
-                            rel = entry.path.decode()
-                            try:
-                                mtime = os.path.getmtime(os.path.join(repo_path, rel))
-                            except OSError:
-                                mtime = 0.0
-                            files.append({
-                                "name": os.path.basename(rel),
-                                "path": rel,
-                                "sha": entry.sha.hex(),
-                                "mtime": mtime,
-                            })
-        finally:
-            repo.close()
+                mtime = os.path.getmtime(full)
+            except OSError:
+                mtime = 0.0
+            files.append({"name": name, "path": name, "mtime": mtime})
 
         # Sort control
         sort_mode = tk.StringVar(value="alpha")
