@@ -795,12 +795,14 @@ class Editor:
         popup.transient(self.root)
         popup.resizable(False, False)
 
-        # Read about.txt
-        about_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "about.txt")
+        # Read about.txt from package data so it resolves in installed builds
+        # (wheel, snap, flatpak), not just a source checkout.
+        from importlib.resources import files
         about_text = ""
-        if os.path.exists(about_path):
-            with open(about_path, "r", encoding="utf-8") as f:
-                about_text = f.read()
+        try:
+            about_text = files("poetit").joinpath("data", "about.txt").read_text(encoding="utf-8")
+        except Exception:
+            pass
 
         # Text pane
         text_frame = tk.Frame(popup, bg="white")
@@ -1007,7 +1009,11 @@ class Editor:
     def _version_click(self):
         """Create a named version (commit) of the current poem."""
         if not getattr(self, "_repo_path", None):
-            messagebox.showinfo("Version", "No repository is open. Use File > New Repository or Open Repository first.")
+            messagebox.showinfo(
+                "Version",
+                "No repository is open.\n\n"
+                f"Use File > Browse Repository to open one at:\n{self._repo_display_path()}",
+            )
             return
         if not self._current_path:
             # Ask for a filename inside the repo — simple text entry, no file selection
@@ -1929,9 +1935,40 @@ class Editor:
         menu.add_command(label="    ", state="disabled")
         menu.add_command(label="    ", state="disabled")
         menu.add_cascade(label="Help", menu=help_menu)
-        menu.add_command(label="~/Documents/Poetit", state="disabled")
+        # Right-aligned, non-interactive indicator showing the active repository
+        # location. Darkened from the default disabled grey so it stays legible.
+        menu.add_command(state="disabled")
+        menu.configure(disabledforeground="#222222")
+        self._menubar = menu
+        self._repo_label_index = menu.index("end")
+        self._refresh_repo_label()
 
         self.root.config(menu=menu)
+
+    @property
+    def _repo_path(self):
+        return getattr(self, "_repo_path_value", None)
+
+    @_repo_path.setter
+    def _repo_path(self, value):
+        self._repo_path_value = value
+        self._refresh_repo_label()
+
+    def _repo_display_path(self):
+        """Absolute path of the active repository, or the default location."""
+        return self._repo_path or os.path.join(
+            os.path.expanduser("~"), "Documents", "Poetit")
+
+    def _refresh_repo_label(self):
+        """Keep the menubar repository indicator in sync with the active repo."""
+        menubar = getattr(self, "_menubar", None)
+        if menubar is None:
+            return
+        try:
+            menubar.entryconfigure(self._repo_label_index,
+                                   label=self._repo_display_path())
+        except tk.TclError:
+            pass
 
     def _on_canvas_resize(self, event):
         self.canvas.itemconfig(self._win, width=event.width)
@@ -2687,10 +2724,12 @@ class Editor:
         tk.Button(popup, text="Close", command=popup.destroy).pack(pady=(0, 10))
 
     def _help_long(self):
-        self._show_help_window("Poetit — Detailed Guide", _LONG_HELP)
+        body = _LONG_HELP.replace("~/Documents/Poetit", self._repo_display_path())
+        self._show_help_window("Poetit — Detailed Guide", body)
 
     def _help_concise(self):
-        self._show_help_window("Concise Help", _CONCISE_HELP)
+        body = _CONCISE_HELP.replace("~/Documents/Poetit", self._repo_display_path())
+        self._show_help_window("Concise Help", body)
 
     def _help_pdf(self):
         """Open the online README (no PDF ships with the app)."""
