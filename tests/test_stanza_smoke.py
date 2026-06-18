@@ -56,6 +56,7 @@ def stanza_pipeline():
     try:
         return stanza.Pipeline(
             'en',
+            package=Linguistics._STANZA_PACKAGE,
             processors=Linguistics._STANZA_PROCESSORS,
             verbose=False,
             download_method=None,  # never hit the network in tests

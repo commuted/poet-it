@@ -410,6 +410,11 @@ class Linguistics:
     # tests/test_stanza_smoke.py rely on this scope staying this narrow.
     _STANZA_PROCESSORS = 'tokenize,mwt,pos,lemma,depparse'
 
+    # Pin the EWT-only model (CC BY-SA 4.0). Stanza's default English package is
+    # a combined model that includes GUM (CC BY-NC-SA 4.0), whose non-commercial
+    # term is incompatible with poetit's MIT licensing.
+    _STANZA_PACKAGE = 'ewt'
+
     @property
     def stanza_ready(self):
         with self._stanza_lock:
@@ -439,6 +444,7 @@ class Linguistics:
         try:
             result = _stanza.Pipeline(
                 'en',
+                package=self._STANZA_PACKAGE,
                 processors=self._STANZA_PROCESSORS,
                 verbose=False,
             )
@@ -459,7 +465,8 @@ class Linguistics:
     def download_stanza_model(self):
         """Download the Stanza English model. Runs synchronously; call from a background thread."""
         try:
-            _stanza.download('en', processors=self._STANZA_PROCESSORS, verbose=False)
+            _stanza.download('en', package=self._STANZA_PACKAGE,
+                             processors=self._STANZA_PROCESSORS, verbose=False)
             with self._stanza_lock:
                 self._stanza_needs_download = False
             return True
@@ -480,6 +487,7 @@ class Linguistics:
             try:
                 result = _stanza.Pipeline(
                     'en',
+                    package=self._STANZA_PACKAGE,
                     processors=self._STANZA_PROCESSORS,
                     verbose=False,
                 )

@@ -16,7 +16,7 @@ pip install -e .
 `pip install -e .` installs every dependency, including the ones behind the meter, diagram, and spell-check features. The dependency diagram additionally needs Stanza's English model, which is not bundled — download it once:
 
 ```bash
-python -c "import stanza; stanza.download('en', processors='tokenize,mwt,pos,lemma,depparse')"
+python -c "import stanza; stanza.download('en', package='ewt', processors='tokenize,mwt,pos,lemma,depparse')"
 ```
 
 To reclaim another ~60 MB, strip the parts of stanza/torch that poetit never
