@@ -1867,8 +1867,12 @@ class Editor:
         self.inner.bind("<Configure>",
                         lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", self._on_canvas_resize)
+        # Bind the wheel globally (not just on the canvas) so scrolling works
+        # while hovering the line widgets too, which otherwise swallow the
+        # event. _on_wheel scopes the effect to when the pointer is over the
+        # editor, so other scrollable pop-ups keep their own wheel handling.
         for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
-            self.canvas.bind(seq, self._scroll)
+            self.root.bind_all(seq, self._on_wheel, add="+")
         # Global drag/release bindings using bind_all so they fire BEFORE
         # entry widget bindings. This lets us intercept the drag and either
         # allow default text selection (return None) or override it for
@@ -1964,13 +1968,37 @@ class Editor:
     def _on_canvas_resize(self, event):
         self.canvas.itemconfig(self._win, width=event.width)
 
-    def _scroll(self, event):
+    def _on_wheel(self, event):
+        """Scroll the editor on wheel / two-finger scroll whenever the pointer
+        is anywhere over it (including the line widgets). Bound globally, so
+        scope it here: if the pointer is over some other widget (a pop-up with
+        its own scrollbar), do nothing and let that widget handle the event."""
+        if not self._pointer_in_editor(event):
+            return
+        self.canvas.yview_scroll(self._wheel_units(event), "units")
+        return "break"
+
+    def _pointer_in_editor(self, event):
+        """True if the pointer is over the editor canvas or any of its children."""
+        w = self.root.winfo_containing(event.x_root, event.y_root)
+        while w is not None:
+            if w is self.canvas:
+                return True
+            w = getattr(w, "master", None)
+        return False
+
+    @staticmethod
+    def _wheel_units(event):
+        """One scroll unit per tick, with direction left to the OS. X11 delivers
+        Button-4/5 (already swapped by the OS when natural scrolling is on);
+        Windows/macOS encode direction in the sign of event.delta. Using only the
+        sign (not magnitude) keeps Button vs MouseWheel identical and lets small
+        trackpad deltas register instead of truncating to zero."""
         if event.num == 4:
-            self.canvas.yview_scroll(-1, "units")
-        elif event.num == 5:
-            self.canvas.yview_scroll(1, "units")
-        else:
-            self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            return -1
+        if event.num == 5:
+            return 1
+        return -1 if event.delta > 0 else 1
 
     # ------------------------------------------------------------------ #
     # Row management
