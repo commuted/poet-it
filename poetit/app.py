@@ -111,45 +111,25 @@ ISSUES_URL   = "https://github.com/commuted/poetit/issues"
 README_URL   = "https://github.com/commuted/poetit#readme"
 
 _CONCISE_HELP = """\
-Poetit — Quick Reference
-
-Toolbar
-  Meter        Show stress-marked meter beneath each line
-  Rhyme        Rhymes for the word at the cursor (or type one in the field)
-  Definition   WordNet definitions for the word at the cursor
-  Diagram      Dependency-parse diagram of the current sentence
-  Thesaurus    Synonyms for the word at the cursor
-  Spell        Toggle inline spell-check (hover a red mark for suggestions)
-  Make Version / Version Tree   Commit or browse past versions of a poem
-
-Editing
-  Enter              Split the line at the cursor
-  Up / Down          Move between lines
-  Shift+Up / Down    Select whole lines (then Cut/Copy)
-  Right at line end  Adds a trailing space, for free-form layout
-
-Poems are stored in ~/Documents/Poetit and tracked with Git.
-"""
-
-_LONG_HELP = """\
 POETIT — HELP
 
 Overview
 --------
-Poetit is a line-by-line poetry editor. Each line of your poem is its own
-field, with a live syllable count in the right margin and a rhyme-scheme
-letter beside it. Poems are kept in a Git repository at ~/Documents/Poetit,
-so every saved version is recoverable.
+Poetit is a poetry editor with a live syllable count in the right margin and
+a rhyme-scheme letter beside each line. Poems are kept in a Git repository at
+~/Documents/Poetit, so every saved version is recoverable.
 
 The toolbar
 -----------
-Meter      Toggles a stress-marked rendering under every line. Capitals mark
-           stressed syllables; a centre dot separates syllables. Analysis runs
-           in the background (prosodic where available, NLTK as a fallback).
+Meter      Replaces each line in place with a stress-marked version of itself;
+           click again to restore the text. Capitals mark stressed syllables; a
+           centre dot separates syllables. Analysis runs in the background
+           (prosodic where available, NLTK as a fallback).
 
 Rhyme      Looks up rhymes for the word at the cursor and lets you insert one
-           into the line. With no line focused, type a word in the field beside
-           the button and press Enter to look up rhymes for display.
+           into the line. You can also type any word that already carries the
+           rhyme you intend, place the cursor on it, and pick the real word
+           from the list that pops up.
 
 Definition WordNet definitions for the word at the cursor, grouped by part of
            speech, with synonyms and example sentences.
@@ -184,6 +164,148 @@ or created from Theme > Edit Themes…, and your choice is remembered.
 Support
 -------
 Questions and bug reports: """ + ISSUES_URL + "\n"
+
+_LONG_HELP = """\
+POETIT — DETAILED GUIDE
+
+Poetit is a poetry editor that keeps every poem in a Git repository under
+~/Documents/Poetit, so each saved version stays recoverable. The right margin
+shows a live syllable count for every line, with a rhyme-scheme letter beside
+it.
+
+CONTENTS
+  1. The editing surface
+  2. Syllable counts and rhyme scheme
+  3. Toolbar tools
+  4. The dependency diagram and its tag legends
+  5. Versions and files
+  6. Appearance
+  7. Support and standards
+
+1. THE EDITING SURFACE
+----------------------
+Type as you would in any editor. A few keys act on whole lines:
+  Enter               Split the line at the cursor (new line below)
+  Up / Down           Move between lines
+  Shift+Up / Down     Select whole lines (then Cut / Copy)
+  Backspace at col 0  Merge the line into the one above
+  Right at line end   Adds a trailing space, for free-form layout
+
+2. SYLLABLE COUNTS AND RHYME SCHEME
+-----------------------------------
+Syllable count (grey margin, right of each line) is read from the bundled CMU
+Pronouncing Dictionary (cmudict); words it does not list fall back to NLTK's
+SyllableTokenizer.
+
+Rhyme-scheme letter (far-right column): two lines share a letter (A, B, C …)
+when their final words share the phoneme suffix from the last stressed vowel
+onward, computed from cmudict. Blank lines get no letter.
+
+3. TOOLBAR TOOLS
+----------------
+Meter       Replaces each line in place with a stress-marked version of
+            itself; click Meter again to restore the original text. Capital
+            letters mark stressed syllables and a centre dot separates
+            syllables. Scansion uses the `prosodic` package when it is installed
+            (stressed / unstressed only) and an NLTK-based heuristic otherwise;
+            the NLTK path additionally marks secondary stress with a leading
+            capital. It runs in a background thread so the editor stays
+            responsive while the rows fill in.
+
+Rhyme       With the cursor on a word, lists words that rhyme with it; click an
+            entry to drop it into the line in place of that word. A useful
+            workflow: type any word that already carries the rhyme you intend,
+            put the cursor on it, then choose the word you actually want from
+            the list. With no line in focus, a field appears beside the button
+            — type a word and press Enter to see its rhymes for reference only.
+            Rhymes come from cmudict.
+
+Definition  Definitions for the word at the cursor, grouped by part of speech,
+            each with synonyms and example sentences. Drawn from WordNet (via
+            the NLTK corpus).
+
+Thesaurus   Synonyms for the word at the cursor, from a bundled MyThes-format
+            English thesaurus (th_en_US). Click a synonym to replace the word.
+
+Spell       Toggles inline spell-checking, backed by the `pyspellchecker`
+            package. Misspelled words gain a red underline; hover one for
+            suggestions and click a suggestion to apply it.
+
+Diagram     Draws a dependency-parse diagram of the sentence at the cursor —
+            see section 4. Parsing uses the `stanza` package; its English model
+            (~500 MB) downloads automatically on first use.
+
+4. THE DEPENDENCY DIAGRAM AND ITS TAG LEGENDS
+---------------------------------------------
+Each word sits on the baseline. A curved arrow runs from every head word to
+its dependent and is labelled with the grammatical relation between them; the
+one word that depends on nothing is marked `root`. Below the picture, an
+annotation row repeats each word with its relation and its part of speech.
+
+The annotation follows the Universal Dependencies (UD) scheme as produced by
+Stanza — the same labels used in CoNLL-U treebank files. Two part-of-speech
+tag sets appear: the abbreviation printed under each word in the diagram is the
+language-specific Penn Treebank tag (XPOS), while the annotation row shows the
+universal tag (UPOS).
+
+Universal POS tags (UPOS) — shown in the annotation row
+    ADJ    adjective                  NUM    numeral
+    ADP    adposition (preposition)   PART   particle
+    ADV    adverb                     PRON   pronoun
+    AUX    auxiliary verb             PROPN  proper noun
+    CCONJ  coordinating conjunction   PUNCT  punctuation
+    DET    determiner                 SCONJ  subordinating conjunction
+    INTJ   interjection               VERB   verb
+    NOUN   noun                       X      other
+
+Penn Treebank tags (XPOS) — printed under each word in the diagram
+    NN   noun, singular               JJ   adjective
+    NNS  noun, plural                 RB   adverb
+    NNP  proper noun, singular        PRP  personal pronoun
+    DT   determiner                   CD   cardinal number
+    IN   preposition / sub. conj.     TO   the word "to"
+    VB   verb, base form              VBD  verb, past tense
+    VBZ  verb, 3rd-person singular    VBG  verb, gerund / present participle
+
+Dependency relations — the arc labels
+    root    head of the whole sentence (depends on nothing)
+    nsubj   nominal subject            cc      coordinating conjunction
+    obj     direct object              conj    conjunct
+    iobj    indirect object            aux     auxiliary
+    det     determiner                 cop     copula
+    case    case marker (preposition   mark    subordinating marker
+            or possessive 's)          amod    adjectival modifier
+    nmod    nominal modifier           advmod  adverbial modifier
+    nummod  numeric modifier           acl     clausal modifier of a noun
+    appos   appositional modifier              (incl. relative clauses)
+            (a renaming phrase)        advcl   adverbial clause
+    obl     oblique nominal            punct   punctuation
+
+The complete tag inventories are defined by the Universal Dependencies project;
+the lists above cover the tags you will meet most often.
+
+5. VERSIONS AND FILES
+---------------------
+Make Version   Commits the current poem with a message (pre-filled with a
+               timestamp). Save a new poem first so it has a file to commit.
+Version Tree   Lists every committed version of the current poem; click one to
+               load it. Unsaved edits prompt a Commit / Discard choice first.
+
+New / Open / Save / Save As behave as usual. Browse Repository lists the poems
+in ~/Documents/Poetit. Import copies an outside .txt file into the repository;
+Export writes the current poem out to a location you choose.
+
+6. APPEARANCE
+-------------
+The Font, Size and Theme menus restyle the editor. Themes can be edited or
+created from Theme > Edit Themes…, and your selection is remembered between
+sessions.
+
+7. SUPPORT AND STANDARDS
+------------------------
+Dependency annotation follows Universal Dependencies
+(universaldependencies.org) in the CoNLL-U format. Questions and bug reports:
+""" + ISSUES_URL + "\n"
 
 
 
@@ -459,7 +581,7 @@ class Editor:
         import re as _re
         text = te.get()
         errors = []
-        for m in _re.finditer(r'[A-Za-z]+', text):
+        for m in _re.finditer(r"[A-Za-z]+(?:['’][A-Za-z]+)*", text):
             word = m.group()
             correct, suggestions = self._nlp.check_spelling(word)
             if not correct:
@@ -2548,9 +2670,12 @@ class Editor:
 
         frame = tk.Frame(popup)
         frame.pack(fill="both", expand=True, padx=10, pady=8)
+        # Monospace so the space-aligned legend columns in the help text line up.
+        # "Courier" is a Tk-guaranteed fixed-width family; a tuple's first element
+        # is a family name, so the named font "TkFixedFont" would not resolve here.
         txt = tk.Text(
-            frame, wrap="word", font=("TkDefaultFont", 10),
-            width=74, height=30, relief="flat", padx=8, pady=6,
+            frame, wrap="word", font=("Courier", 10),
+            width=78, height=30, relief="flat", padx=8, pady=6,
         )
         sb = tk.Scrollbar(frame, orient="vertical", command=txt.yview)
         txt.configure(yscrollcommand=sb.set)
@@ -2562,10 +2687,10 @@ class Editor:
         tk.Button(popup, text="Close", command=popup.destroy).pack(pady=(0, 10))
 
     def _help_long(self):
-        self._show_help_window("Poetit Help", _LONG_HELP)
+        self._show_help_window("Poetit — Detailed Guide", _LONG_HELP)
 
     def _help_concise(self):
-        messagebox.showinfo("Concise Help", _CONCISE_HELP)
+        self._show_help_window("Concise Help", _CONCISE_HELP)
 
     def _help_pdf(self):
         """Open the online README (no PDF ships with the app)."""

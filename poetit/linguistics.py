@@ -27,6 +27,24 @@ except ImportError:
 
 SEP_DOT = "·"
 
+# Trailing enclitics for English contractions and possessives, used to accept
+# apostrophe forms (e.g. "children's") whose stem is a known word.
+_CONTRACTION_CLITICS = frozenset({"s", "t", "d", "m", "re", "ve", "ll"})
+
+# Archaic / poetic vocabulary the general dictionary lacks, seeded into the
+# spell checker so it does not underline them. Written as the word tokenizer
+# yields them: a leading apostrophe is dropped ("'tis" -> "tis"), while an
+# internal one is kept ("o'er", "ne'er").
+_POETIC_WORDS = frozenset({
+    "tis", "twas", "twere", "twill", "twixt", "gainst", "neath", "mongst",
+    "o'er", "ne'er", "e'er", "e'en",
+    "ere", "oft", "ope", "whilst", "amongst", "betwixt", "hither", "thither",
+    "whither", "yon", "yonder", "morn", "eve", "wrought", "clad",
+    "thee", "thou", "thy", "thine", "ye", "hath", "doth", "dost", "hast",
+    "wast", "wert", "shalt", "wilt", "canst", "didst", "couldst", "wouldst",
+    "shouldst", "mayst", "prithee", "forsooth", "verily",
+})
+
 _WEAK_DEPS = frozenset({
     # Universal Dependencies (Stanza)
     'aux', 'aux:pass', 'det', 'mark', 'cc', 'case', 'expl', 'cop',
@@ -160,6 +178,8 @@ class Linguistics:
         self._stanza_loading        = False
         self._stanza_needs_download = False
         self._spell              = _SpellChecker() if SPELLCHECKER_AVAILABLE else None
+        if self._spell is not None:
+            self._spell.word_frequency.load_words(_POETIC_WORDS)
 
     def start_background_loads(self):
         if STANZA_AVAILABLE:
@@ -345,7 +365,7 @@ class Linguistics:
         """Return the set of lowercase unknown words found in text."""
         if self._spell is None:
             return set()
-        words = re.findall(r'[A-Za-z]+', text)
+        words = re.findall(r"[A-Za-z]+(?:['’][A-Za-z]+)*", text)
         if not words:
             return set()
         return self._spell.unknown([w.lower() for w in words])
@@ -361,6 +381,16 @@ class Linguistics:
         lower = word.lower()
         if not self._spell.unknown([lower]):
             return True, []
+        # Contractions and possessives the dictionary may not list as a unit
+        # (e.g. "children's"): accept when the stem is a known word and the
+        # trailing piece is a standard English enclitic. Common forms such as
+        # "isn't" or "dog's" are already in the dictionary and returned above.
+        if "'" in lower or "’" in lower:
+            parts = re.split(r"['’]", lower)
+            if (len(parts) == 2 and parts[0]
+                    and parts[1] in _CONTRACTION_CLITICS
+                    and not self._spell.unknown([parts[0]])):
+                return True, []
         candidates = self._spell.candidates(lower) or set()
         candidates.discard(lower)
         ranked = sorted(
