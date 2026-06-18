@@ -67,6 +67,7 @@ include = ["poetit", "poetit.*"]
     "data/*.dict",
     "data/*.png",
     "data/*.desktop",
+    "data/*.txt",
     "data/corpora/*.zip",
 ]
 

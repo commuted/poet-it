@@ -6,25 +6,23 @@ pkgdesc="Desktop poetry editor with meter analysis, rhyme lookup, thesaurus, and
 arch=('any')
 url="https://github.com/commuted/poetit"
 license=('MIT')
+# Mirrors the required dependencies in pyproject.toml [project].dependencies.
 depends=(
     'python>=3.10'
     'tk'
     'python-nltk'
-    'python-pillow'
+    'python-prosodic'
+    'python-stanza'
     'python-dulwich'
+    'python-resvg-py'
+    'python-pillow'
     'python-pyspellchecker'
-    'python-transformers'
 )
 makedepends=(
     'python-build'
     'python-installer'
     'python-wheel'
     'python-setuptools'
-)
-optdepends=(
-    'python-stanza: dependency diagram support (downloads model on first run)'
-    'python-prosodic: enhanced meter analysis'
-    'python-resvg-py: SVG diagram rendering'
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/commuted/$pkgname/archive/v$pkgver.tar.gz")
 sha256sums=('SKIP')   # replace with actual sha256 before AUR submission

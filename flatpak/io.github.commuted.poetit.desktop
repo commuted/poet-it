@@ -7,6 +7,6 @@ Exec=poetit %U
 Icon=io.github.commuted.poetit
 Terminal=false
 Type=Application
-Categories=Office;TextEditor;Education;
+Categories=Office;TextEditor;
 Keywords=poetry;editor;rhyme;meter;thesaurus;linguistics;spell;
 StartupNotify=true
