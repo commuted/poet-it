@@ -135,6 +135,20 @@ def _svg_escape(text):
                 .replace('>', '&gt;').replace('"', '&quot;'))
 
 
+# --- Dependency-diagram arc geometry -------------------------------------- #
+# Arcs are flat-topped brackets: a vertical riser, a rounded corner, a level
+# horizontal apex, a rounded corner, and a vertical drop. Distinct apex heights
+# per nesting level + risers anchored at word x-positions make the arcs
+# non-crossing by construction. Tune these to taste; ARC_SCALE scales the whole
+# diagram uniformly.
+ARC_SCALE      = 1.0   # uniform multiplier for every dimension below
+ARC_RISE       = 14    # straight vertical riser before the corner (px)
+ARC_APEX       = 18    # flat-top height above the attachment line, level 1 (px)
+ARC_CORNER     = 25 #8     # corner radius / distance to horizontal on the X axis (px)
+ARC_LEVEL_STEP = 28 #34    # extra apex height per nesting level (px)
+ARC_COL_W      = 110   # horizontal pixels per word
+
+
 def _arc_levels(words):
     """Assign each dependent word a nesting level (1-based) via interval graph coloring."""
     spans = [
@@ -168,19 +182,29 @@ def _stanza_to_svg(doc, bg="#fffef0", color="#003388", sent_index=0):
     words = doc.sentences[sent_index].words
     n = len(words)
 
-    col_w        = 110   # horizontal pixels per word
-    pad_x        = 60    # left/right margin
-    entry_offset = 22    # gap between word baseline and arc attachment point
-    level_step   = 34    # px per nesting level
-    pad_top      = 28    # clearance above topmost arc label
-    root_clear   = 42    # space needed for the ROOT indicator above entry_y
+    sc           = ARC_SCALE
+    col_w        = ARC_COL_W * sc       # horizontal pixels per word
+    pad_x        = 60 * sc              # left/right margin
+    entry_offset = 22 * sc              # gap between word baseline and arc attachment
+    level_step   = ARC_LEVEL_STEP * sc  # extra apex height per nesting level
+    rise         = ARC_RISE * sc        # straight vertical riser
+    corner       = ARC_CORNER * sc      # corner radius / x distance to horizontal
+    # Level-1 flat-top height. Floor it at riser + a full-radius corner, or the
+    # corner gets squashed and stops responding to the radius at the lowest level.
+    apex         = max(ARC_APEX * sc, rise + corner)
+    pad_top      = 28 * sc              # clearance above topmost arc label
+    root_clear   = 42 * sc              # space needed for the ROOT indicator
+    fs_word      = round(13 * sc)       # word font size
+    fs_tag       = round(10 * sc)       # POS tag / label font size
+    stroke       = 1.5 * sc
 
     arc_lvls  = _arc_levels(words)
     max_level = max(arc_lvls.values(), default=1)
 
-    entry_y  = pad_top + max(max_level * level_step + 14, root_clear)
+    top_apex = apex + (max_level - 1) * level_step
+    entry_y  = pad_top + max(top_apex + 14 * sc, root_clear)
     baseline = entry_y + entry_offset
-    total_h  = baseline + 48
+    total_h  = baseline + 48 * sc
     total_w  = pad_x * 2 + max(n - 1, 0) * col_w
 
     arcs, arc_labels, word_els = [], [], []
@@ -196,53 +220,70 @@ def _stanza_to_svg(doc, bg="#fffef0", color="#003388", sent_index=0):
         xi = pad_x + (word.id - 1) * col_w
 
         word_els.append(
-            f'<text x="{xi}" y="{baseline}" text-anchor="middle"'
-            f' font-family="Helvetica,Arial,sans-serif" font-size="13"'
+            f'<text x="{xi:.1f}" y="{baseline:.1f}" text-anchor="middle"'
+            f' font-family="Helvetica,Arial,sans-serif" font-size="{fs_word}"'
             f' font-weight="bold" fill="#111">{_svg_escape(word.text)}</text>'
         )
         pos = word.xpos or word.upos or ''
         word_els.append(
-            f'<text x="{xi}" y="{baseline + 18}" text-anchor="middle"'
-            f' font-family="Helvetica,Arial,sans-serif" font-size="10"'
+            f'<text x="{xi:.1f}" y="{baseline + 18 * sc:.1f}" text-anchor="middle"'
+            f' font-family="Helvetica,Arial,sans-serif" font-size="{fs_tag}"'
             f' fill="#666">{_svg_escape(pos)}</text>'
         )
 
         if word.head == 0:
-            root_y0 = entry_y - 30
+            root_y0  = entry_y - 30 * sc
+            lbl_base = root_y0 - 5 * sc
             arcs.append(
-                f'<line x1="{xi}" y1="{root_y0}" x2="{xi}" y2="{entry_y}"'
-                f' stroke="{color}" stroke-width="1.5" marker-end="url(#arr)"/>'
+                f'<line x1="{xi:.1f}" y1="{root_y0:.1f}" x2="{xi:.1f}" y2="{entry_y:.1f}"'
+                f' stroke="{color}" stroke-width="{stroke:.2f}" marker-end="url(#arr)"/>'
+            )
+            # White rect behind the label, like the deprel labels — the root
+            # word is the head of its dependents, so their risers run vertically
+            # at this x and would otherwise bisect the "root" text.
+            lbl_w = len("root") * 6 * sc + 6 * sc
+            arc_labels.append(
+                f'<rect x="{xi - lbl_w / 2:.1f}" y="{lbl_base - 10 * sc:.1f}"'
+                f' width="{lbl_w:.1f}" height="{11 * sc:.1f}" fill="{bg}"/>'
             )
             arc_labels.append(
-                f'<text x="{xi}" y="{root_y0 - 5}" text-anchor="middle"'
-                f' font-family="Helvetica,Arial,sans-serif" font-size="10"'
+                f'<text x="{xi:.1f}" y="{lbl_base:.1f}" text-anchor="middle"'
+                f' font-family="Helvetica,Arial,sans-serif" font-size="{fs_tag}"'
                 f' fill="{color}">root</text>'
             )
         else:
-            xh     = pad_x + (word.head - 1) * col_w
-            level  = arc_lvls.get(word.id, 1)
-            peak_y = entry_y - level * level_step
-            mid_x  = (xi + xh) / 2
+            xh    = pad_x + (word.head - 1) * col_w
+            level = arc_lvls.get(word.id, 1)
+            top   = entry_y - (apex + (level - 1) * level_step)   # flat-top y
+            mid_x = (xi + xh) / 2
+            sgn   = 1 if xi > xh else -1
+            cdx   = corner                                        # corner x extent
+            cdy   = corner                                        # corner y extent (full radius at every level)
 
-            # Cubic bezier: control points directly above endpoints → vertical rise,
-            # flat top, vertical drop; eliminates diagonal crossings between arcs
+            # Flat-topped bracket: riser, rounded corner, horizontal apex,
+            # rounded corner, drop. Distinct apex heights per level + verticals
+            # anchored at the word x-positions keep arcs from crossing.
             arcs.append(
-                f'<path d="M {xh} {entry_y} C {xh} {peak_y}, {xi} {peak_y}, {xi} {entry_y}"'
-                f' stroke="{color}" fill="none" stroke-width="1.5"'
+                f'<path d="M {xh:.1f},{entry_y:.1f}'
+                f' L {xh:.1f},{top + cdy:.1f}'
+                f' Q {xh:.1f},{top:.1f} {xh + sgn * cdx:.1f},{top:.1f}'
+                f' L {xi - sgn * cdx:.1f},{top:.1f}'
+                f' Q {xi:.1f},{top:.1f} {xi:.1f},{top + cdy:.1f}'
+                f' L {xi:.1f},{entry_y:.1f}"'
+                f' stroke="{color}" fill="none" stroke-width="{stroke:.2f}"'
                 f' marker-end="url(#arr)"/>'
             )
 
-            # Cubic bezier at t=0.5: y = 0.25·entry_y + 0.75·peak_y (actual curve position)
-            lbl_center_y = round(entry_y * 0.25 + peak_y * 0.75)
+            # Label centered on the horizontal apex.
             lbl_text = word.deprel or ""
-            lbl_w = len(lbl_text) * 6 + 6
+            lbl_w = len(lbl_text) * 6 * sc + 6 * sc
             arc_labels.append(
-                f'<rect x="{round(mid_x - lbl_w / 2)}" y="{lbl_center_y - 6}"'
-                f' width="{lbl_w}" height="11" fill="{bg}"/>'
+                f'<rect x="{mid_x - lbl_w / 2:.1f}" y="{top - 6 * sc:.1f}"'
+                f' width="{lbl_w:.1f}" height="{11 * sc:.1f}" fill="{bg}"/>'
             )
             arc_labels.append(
-                f'<text x="{mid_x}" y="{lbl_center_y + 4}" text-anchor="middle"'
-                f' font-family="Helvetica,Arial,sans-serif" font-size="10"'
+                f'<text x="{mid_x:.1f}" y="{top + 4 * sc:.1f}" text-anchor="middle"'
+                f' font-family="Helvetica,Arial,sans-serif" font-size="{fs_tag}"'
                 f' fill="{color}">{_svg_escape(lbl_text)}</text>'
             )
 
