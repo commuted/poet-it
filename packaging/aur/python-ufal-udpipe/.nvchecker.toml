@@ -1,0 +1,6 @@
+# nvchecker config: watch the PyPI bindings release (not UDPipe core — the
+# binding version differs). `nvchecker -c .nvchecker.toml` reports the latest;
+# `nvtake` accepts it; update.sh applies it to the PKGBUILD and .SRCINFO.
+[python-ufal-udpipe]
+source = "pypi"
+pypi = "ufal.udpipe"

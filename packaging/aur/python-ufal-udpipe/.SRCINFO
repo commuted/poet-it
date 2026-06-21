@@ -1,0 +1,18 @@
+pkgbase = python-ufal-udpipe
+	pkgdesc = Python bindings for UDPipe: tokenization, POS tagging, lemmatization and dependency parsing
+	pkgver = 1.4.0.1
+	pkgrel = 1
+	url = https://ufal.mff.cuni.cz/udpipe
+	arch = x86_64
+	arch = aarch64
+	license = MPL-2.0
+	makedepends = python-build
+	makedepends = python-installer
+	makedepends = python-setuptools
+	makedepends = python-wheel
+	makedepends = gcc
+	depends = python
+	source = https://files.pythonhosted.org/packages/source/u/ufal.udpipe/ufal_udpipe-1.4.0.1.tar.gz
+	sha256sums = 42b3c19888f3228ffb6d91c0991c949e378c5dafecc12008c089a1f4182357d7
+
+pkgname = python-ufal-udpipe

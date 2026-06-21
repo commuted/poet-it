@@ -1,0 +1,29 @@
+# Maintainer: Ron Hinchley <commuted@gmail.com>
+# Python bindings for UDPipe (https://ufal.mff.cuni.cz/udpipe). Tracked on PyPI
+# as "ufal.udpipe"; this version follows the bindings release, not UDPipe core.
+pkgname=python-ufal-udpipe
+_pyname=ufal.udpipe
+_dist=ufal_udpipe
+pkgver=1.4.0.1
+pkgrel=1
+pkgdesc="Python bindings for UDPipe: tokenization, POS tagging, lemmatization and dependency parsing"
+# Compiled SWIG/C++ extension, so not 'any'.
+arch=('x86_64' 'aarch64')
+url="https://ufal.mff.cuni.cz/udpipe"
+license=('MPL-2.0')
+depends=('python')
+# The sdist ships the pre-generated SWIG wrapper (udpipe_python.cpp), so only a
+# C++ compiler and the standard Python build stack are needed — no 'swig'.
+makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-wheel' 'gcc')
+source=("https://files.pythonhosted.org/packages/source/${_pyname::1}/${_pyname}/${_dist}-${pkgver}.tar.gz")
+sha256sums=('42b3c19888f3228ffb6d91c0991c949e378c5dafecc12008c089a1f4182357d7')
+
+build() {
+    cd "${_dist}-${pkgver}"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "${_dist}-${pkgver}"
+    python -m installer --destdir="$pkgdir" dist/*.whl
+}
