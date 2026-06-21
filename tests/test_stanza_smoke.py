@@ -124,11 +124,12 @@ class TestPipelineSurface:
         assert _sentence_index_at_offset(doc, poem.index("sings")) == 1
 
     def test_linguistics_adapter(self, stanza_doc):
-        """End-to-end through poetit's own accessor."""
+        """End-to-end through poetit's own diagram accessor (Stanza quality mode
+        when its model is present, else the bundled UDPipe fallback)."""
         nlp = Linguistics()
-        doc = nlp.get_stanza_doc(SAMPLE_TEXT)
+        doc = nlp.get_diagram_doc(SAMPLE_TEXT)
         if doc is None:
-            pytest.skip("Linguistics could not load the stanza pipeline")
+            pytest.skip("no diagram backend available")
         words = [
             (w.text, w.xpos or 'NN', w.deprel or '')
             for sent in doc.sentences

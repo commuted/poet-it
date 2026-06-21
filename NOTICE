@@ -34,6 +34,14 @@ Rhyming dictionary data (rdict.json)
   https://github.com/commuted/rhyming-dictionary
   An adaptation of the CMU Pronouncing Dictionary.
 
+Dependency-parse model (english-ewt.udpipe)
+  A UDPipe model trained on the Universal Dependencies English Web Treebank.
+  License: CC BY-SA 4.0 (attribution + share-alike; commercial use permitted)
+  Model distribution: https://github.com/bnosac/udpipe.models.ud
+  UDPipe: Straka & Straková, ÚFAL, Charles University — https://ufal.mff.cuni.cz/udpipe
+  Training data: UD English-EWT, CC BY-SA 4.0
+  https://github.com/UniversalDependencies/UD_English-EWT
+
 Thesaurus data (th_en_US_new.json)
   Derived from WordNet 2.0
   Copyright (c) 2003 by Princeton University. All rights reserved.

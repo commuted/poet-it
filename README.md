@@ -9,34 +9,39 @@ Python dependencies are ~1.7 GB installed (mostly PyTorch's CPU inference librar
 ## Install
 
 ```bash
-pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only torch, ~4.5 GB smaller
 pip install -e .
 ```
 
-`pip install -e .` installs every dependency, including the ones behind the meter, diagram, and spell-check features. The dependency diagram additionally needs Stanza's English model, which is not bundled — download it once:
+That's the whole base install: every feature works, including the dependency diagram, which uses a small **UDPipe** model bundled with the app (~16 MB, no download). Dependencies are lightweight — no PyTorch.
+
+### Quality mode (optional, more accurate diagrams)
+
+The bundled UDPipe parser is fast and tiny but occasionally misanalyses harder syntax (e.g. reduced relative clauses). For a more accurate dependency diagram, install the `quality` extra, which adds **Stanza**'s biaffine parser:
 
 ```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only torch, ~4.5 GB smaller than the CUDA build
+pip install -e ".[quality]"
 python -c "import stanza; stanza.download('en', package='ewt', processors='tokenize,mwt,pos,lemma,depparse')"
 ```
 
-To reclaim another ~60 MB, strip the parts of stanza/torch that poetit never
-executes (test suites, C++ headers, bundled binaries):
+Cost of quality mode: PyTorch adds ~1.7 GB installed, and Stanza's EWT model is a ~500 MB first-run download. When present, poetit uses Stanza automatically; otherwise it falls back to the bundled UDPipe model. To trim ~60 MB of stanza/torch files poetit never executes:
 
 ```bash
 python3 scripts/trim_nlp_footprint.py --keep-pyi \
     --site-packages "$(python -c 'import site; print(site.getsitepackages()[0])')"
 ```
 
-Each feature is powered by a specific package, all installed by default:
+Each feature is powered by a specific package:
 
 | Feature | Powered by |
 |---|---|
 | Enhanced meter analysis | `prosodic` (NLTK fallback otherwise) |
-| Dependency diagram | `stanza`, `resvg_py`, `Pillow` |
+| Dependency diagram | `ufal.udpipe` (bundled model); `stanza` in quality mode |
+| Diagram rendering | `resvg_py`, `Pillow` |
 | Spell check | `pyspellchecker` |
 | Version control | `dulwich` |
 
-NLTK data (punkt tokenizer, POS tagger) is downloaded automatically on first launch if not already present. CMUDict, WordNet, and the thesaurus are bundled with the package — no separate download needed.
+NLTK data (punkt tokenizer, POS tagger) is downloaded automatically on first launch if not already present. CMUDict, WordNet, the thesaurus, and the UDPipe diagram model are bundled with the package — no separate download needed.
 
 ---
 
@@ -107,7 +112,9 @@ Click **Spell** to toggle inline spell-checking (powered by `pyspellchecker`). M
 
 ### Dependency diagram
 
-Click in your poem then click **Diagram** to render a Stanza dependency parse of the sentence containing the cursor. (Sentences are segmented across the whole poem, so a diagram can span more than one line.) It shows the grammatical relationships between words, with POS tags and dependency labels. Stanza's English model downloads automatically on first use.
+Click in your poem then click **Diagram** to render a dependency parse of the sentence containing the cursor. Sentences are segmented with NLTK so a sentence (and its diagram) can span several lines — capitalised line starts don't break it. The diagram shows grammatical relationships between words, with POS tags and Universal Dependencies labels.
+
+Parsing uses the bundled **UDPipe** English model by default (no download). If the optional **quality mode** is installed (see Install), poetit uses Stanza's more accurate biaffine parser instead and falls back to UDPipe when it isn't available.
 
 ---
 
@@ -181,10 +188,11 @@ Tests cover `file_io` (round-trip write/read, metadata, edge cases), `linguistic
 ## Requirements
 
 - Python ≥ 3.10
-- nltk ≥ 3.8 *(syllables, POS tagging, WordNet)*
+- nltk ≥ 3.8 *(syllables, POS tagging, WordNet, sentence segmentation)*
 - prosodic ≥ 3.0 *(meter analysis)*
-- stanza ≥ 1.7 *(dependency diagram; downloads its English model on first use)*
+- ufal.udpipe ≥ 1.3 *(dependency diagram; English model bundled)*
 - resvg_py ≥ 0.3 *(diagram rendering)*
 - Pillow ≥ 9.0 *(diagram display)*
 - pyspellchecker ≥ 0.7 *(spell check)*
 - dulwich ≥ 0.22 *(version control)*
+- stanza ≥ 1.7 *(optional, `quality` extra — more accurate diagrams; pulls PyTorch)*

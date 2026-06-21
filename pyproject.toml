@@ -35,7 +35,7 @@ classifiers = [
 dependencies = [
     "nltk>=3.8",
     "prosodic>=3.0",
-    "stanza>=1.7",
+    "ufal.udpipe>=1.3",
     "dulwich>=0.22",
     "resvg_py>=0.3",
     "Pillow>=9.0",
@@ -48,6 +48,10 @@ Repository    = "https://github.com/commuted/poetit"
 "Bug Tracker" = "https://github.com/commuted/poetit/issues"
 
 [project.optional-dependencies]
+# "Quality mode": a more accurate dependency diagram via Stanza's biaffine
+# parser. Opt-in because Stanza pulls PyTorch (~1.7 GB) and downloads its EWT
+# model (~500 MB) on first use. Without it, poetit uses the bundled UDPipe model.
+quality = ["stanza>=1.7"]
 dev = ["build", "twine", "pytest>=8.0"]
 
 [project.scripts]
@@ -68,6 +72,7 @@ include = ["poetit", "poetit.*"]
     "data/*.png",
     "data/*.desktop",
     "data/*.txt",
+    "data/*.udpipe",
     "data/corpora/*.zip",
 ]
 

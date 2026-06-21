@@ -20,12 +20,39 @@ except ImportError:
     STANZA_AVAILABLE = False
 
 try:
+    from ufal.udpipe import (Model as _UDModel, Sentence as _UDSentence,
+                             ProcessingError as _UDError)
+    UDPIPE_AVAILABLE = True
+except ImportError:
+    UDPIPE_AVAILABLE = False
+
+try:
     from spellchecker import SpellChecker as _SpellChecker
     SPELLCHECKER_AVAILABLE = True
 except ImportError:
     SPELLCHECKER_AVAILABLE = False
 
 SEP_DOT = "·"
+
+# Lightweight stand-ins mirroring the slice of Stanza's parsed-doc surface that
+# the diagram code (popups._stanza_to_svg, show_diagram_popup) and the cursor →
+# sentence mapping (_sentence_index_at_offset in app.py) consume. Building these
+# from UDPipe output lets the renderer stay backend-agnostic.
+class _DiagramWord:
+    __slots__ = ('id', 'text', 'lemma', 'upos', 'xpos', 'head', 'deprel')
+
+class _DiagramToken:
+    __slots__ = ('start_char',)
+    def __init__(self, start_char):
+        self.start_char = start_char
+
+class _DiagramSentence:
+    __slots__ = ('words', 'tokens', 'text')
+
+class _DiagramDoc:
+    __slots__ = ('sentences',)
+    def __init__(self, sentences):
+        self.sentences = sentences
 
 # Trailing enclitics for English contractions and possessives, used to accept
 # apostrophe forms (e.g. "children's") whose stem is a known word.
@@ -173,17 +200,24 @@ class Linguistics:
         self._thesaurus_lock     = threading.Lock()
         self._thesaurus          = None
         self._thesaurus_loading  = False
-        self._stanza_lock           = threading.Lock()
-        self._stanza_nlp            = None
-        self._stanza_loading        = False
-        self._stanza_needs_download = False
+        self._stanza_lock    = threading.Lock()
+        self._stanza_nlp     = None
+        self._stanza_loading = False
+        self._stanza_failed  = False
+        self._udpipe_lock    = threading.Lock()
+        self._udpipe_model   = None
+        self._udpipe_failed  = False
         self._spell              = _SpellChecker() if SPELLCHECKER_AVAILABLE else None
         if self._spell is not None:
             self._spell.word_frequency.load_words(_POETIC_WORDS)
 
     def start_background_loads(self):
-        if STANZA_AVAILABLE:
-            threading.Thread(target=self._load_stanza_background, daemon=True).start()
+        # Warm whichever diagram backend will actually be used: Stanza (quality
+        # mode) if its model is on disk, otherwise the bundled UDPipe model.
+        if STANZA_AVAILABLE and self._stanza_model_on_disk():
+            threading.Thread(target=self._ensure_stanza_pipeline, daemon=True).start()
+        elif UDPIPE_AVAILABLE:
+            threading.Thread(target=self._ensure_udpipe_model, daemon=True).start()
         threading.Thread(target=self._load_thesaurus_background, daemon=True).start()
 
     # ------------------------------------------------------------------ #
@@ -415,19 +449,9 @@ class Linguistics:
     # term is incompatible with poetit's MIT licensing.
     _STANZA_PACKAGE = 'ewt'
 
-    @property
-    def stanza_ready(self):
-        with self._stanza_lock:
-            return self._stanza_nlp is not None
-
-    @property
-    def stanza_loading(self):
-        with self._stanza_lock:
-            return self._stanza_loading
-
     @staticmethod
     def _stanza_model_on_disk():
-        """Return True if the stanza English model files are present on disk."""
+        """Return True if the Stanza English model files are present on disk."""
         tokenize_dir = os.path.join(
             os.path.expanduser('~'), 'stanza_resources', 'en', 'tokenize'
         )
@@ -436,72 +460,172 @@ class Linguistics:
         except OSError:
             return False
 
-    def _load_stanza_background(self):
-        with self._stanza_lock:
-            if not STANZA_AVAILABLE or self._stanza_nlp is not None or self._stanza_loading:
-                return
-            self._stanza_loading = True
-        try:
-            result = _stanza.Pipeline(
-                'en',
-                package=self._STANZA_PACKAGE,
-                processors=self._STANZA_PROCESSORS,
-                verbose=False,
-            )
-        except Exception:
-            result = None
-        with self._stanza_lock:
-            if result is not None:
-                self._stanza_nlp = result
-            else:
-                self._stanza_needs_download = not self._stanza_model_on_disk()
-            self._stanza_loading = False
-
-    @property
-    def stanza_needs_download(self):
-        with self._stanza_lock:
-            return self._stanza_needs_download
-
-    def download_stanza_model(self):
-        """Download the Stanza English model. Runs synchronously; call from a background thread."""
-        try:
-            _stanza.download('en', package=self._STANZA_PACKAGE,
-                             processors=self._STANZA_PROCESSORS, verbose=False)
-            with self._stanza_lock:
-                self._stanza_needs_download = False
-            return True
-        except Exception:
-            return False
-
-    def get_stanza_doc(self, text):
+    def _ensure_stanza_pipeline(self):
+        """Load the Stanza ewt pipeline from disk; never downloads. Returns the
+        pipeline, or None if Stanza or its model is absent (the diagram then
+        falls back to UDPipe). tokenize_no_ssplit keeps each Punkt span we feed
+        it as a single sentence rather than re-segmenting it."""
         if not STANZA_AVAILABLE:
             return None
         with self._stanza_lock:
-            nlp = self._stanza_nlp
-            if nlp is None and not self._stanza_loading:
-                self._stanza_loading = True
-                do_load = True
-            else:
-                do_load = False
-        if do_load:
+            if self._stanza_nlp is not None or self._stanza_failed or self._stanza_loading:
+                return self._stanza_nlp
+            self._stanza_loading = True
+        pipeline = None
+        if self._stanza_model_on_disk():
             try:
-                result = _stanza.Pipeline(
+                pipeline = _stanza.Pipeline(
                     'en',
                     package=self._STANZA_PACKAGE,
                     processors=self._STANZA_PROCESSORS,
+                    tokenize_no_ssplit=True,
+                    download_method=None,
                     verbose=False,
                 )
             except Exception:
-                result = None
-            with self._stanza_lock:
-                self._stanza_nlp = result
-                if result is None:
-                    self._stanza_needs_download = not self._stanza_model_on_disk()
-                self._stanza_loading = False
-            nlp = result
-        if nlp is None:
+                pipeline = None
+        with self._stanza_lock:
+            self._stanza_nlp = pipeline
+            self._stanza_failed = pipeline is None
+            self._stanza_loading = False
+        return pipeline
+
+    @staticmethod
+    def _stanza_words(pipeline, seg):
+        doc = pipeline(seg)
+        if not doc.sentences:
             return None
-        return nlp(text)
+        out = []
+        for sw in doc.sentences[0].words:   # tokenize_no_ssplit => one sentence
+            w = _DiagramWord()
+            w.id, w.text, w.lemma = sw.id, sw.text, sw.lemma
+            w.upos, w.xpos = sw.upos, sw.xpos
+            w.head, w.deprel = sw.head, sw.deprel
+            out.append(w)
+        return out
+
+    # ------------------------------------------------------------------ #
+    # Dependency parsing for the diagram (UDPipe default, Stanza if present)
+    # ------------------------------------------------------------------ #
+
+    # English EWT model, CC BY-SA 4.0 (commercial use allowed) — bundled, so no
+    # runtime download. See NOTICE for attribution.
+    _UDPIPE_MODEL_FILE = 'english-ewt.udpipe'
+
+    def _udpipe_model_path(self):
+        from importlib.resources import files
+        try:
+            return str(files('poetit').joinpath('data', self._UDPIPE_MODEL_FILE))
+        except Exception:
+            here = os.path.dirname(os.path.abspath(__file__))
+            return os.path.join(here, 'data', self._UDPIPE_MODEL_FILE)
+
+    def _ensure_udpipe_model(self):
+        """Load the bundled UDPipe model once; thread-safe. Returns it or None."""
+        with self._udpipe_lock:
+            if self._udpipe_model is not None or self._udpipe_failed:
+                return self._udpipe_model
+        model = _UDModel.load(self._udpipe_model_path()) if UDPIPE_AVAILABLE else None
+        with self._udpipe_lock:
+            if model:
+                self._udpipe_model = model
+            else:
+                self._udpipe_failed = True
+            return self._udpipe_model
+
+    @property
+    def diagram_ready(self):
+        with self._udpipe_lock:
+            udpipe = self._udpipe_model is not None
+        with self._stanza_lock:
+            stanza = self._stanza_nlp is not None
+        return udpipe or stanza
+
+    @property
+    def diagram_backend(self):
+        """Which parser the diagram is currently using: 'stanza' (quality mode),
+        'udpipe' (bundled default), or None if neither has loaded yet."""
+        with self._stanza_lock:
+            if self._stanza_nlp is not None:
+                return 'stanza'
+        with self._udpipe_lock:
+            if self._udpipe_model is not None:
+                return 'udpipe'
+        return None
+
+    @staticmethod
+    def _segment_spans(text):
+        """(start, end) char spans of sentences in text.
+
+        Segmentation is delegated to NLTK's trained Punkt model, which breaks on
+        real sentence boundaries (terminal punctuation, abbreviation-aware) and
+        — unlike UDPipe's tokenizer — does NOT treat a capitalised word after a
+        line break as a new sentence. That keeps a verse sentence spanning
+        several lines intact, e.g. the lines of a sonnet up to its full stop.
+        Offsets are recovered by locating each returned sentence in the source.
+        """
+        spans, pos = [], 0
+        for sent in nltk.sent_tokenize(text):
+            idx = text.find(sent, pos)
+            if idx < 0:
+                continue
+            spans.append((idx, idx + len(sent)))
+            pos = idx + len(sent)
+        if not spans and text.strip():
+            spans = [(0, len(text))]
+        return spans
+
+    def get_diagram_doc(self, text):
+        """Dependency parse for the diagram, as a Stanza-shaped doc.
+
+        Sentences are segmented with Punkt (_segment_spans). Each span is parsed
+        by the best backend available: Stanza in 'quality mode' if it is
+        installed and its ewt model is present, otherwise the bundled UDPipe
+        model. Both feed the renderer the same _DiagramWord shape.
+        """
+        spans = self._segment_spans(text)
+        if not spans:
+            return _DiagramDoc([])
+        stanza_pl = self._ensure_stanza_pipeline()
+        udpipe_model = self._ensure_udpipe_model() if stanza_pl is None else None
+        if stanza_pl is None and udpipe_model is None:
+            return None
+        sentences = []
+        for start, end in spans:
+            seg = " ".join(text[start:end].split())   # one normalized line
+            if stanza_pl is not None:
+                words = self._stanza_words(stanza_pl, seg)
+            else:
+                words = self._udpipe_words(udpipe_model, seg)
+            if not words:
+                continue
+            sent = _DiagramSentence()
+            sent.words = words
+            sent.tokens = [_DiagramToken(start)]   # offset into the original text
+            sent.text = seg
+            sentences.append(sent)
+        return _DiagramDoc(sentences)
+
+    @staticmethod
+    def _udpipe_words(model, seg):
+        # 'presegmented' => the span is one sentence; UDPipe will not re-split it.
+        tokenizer = model.newTokenizer("presegmented")
+        if tokenizer is None:
+            return None
+        tokenizer.setText(seg)
+        s = _UDSentence()
+        if not tokenizer.nextSentence(s, _UDError()):
+            return None
+        model.tag(s, _UDModel.DEFAULT)
+        model.parse(s, _UDModel.DEFAULT)
+        out = []
+        for uw in list(s.words)[1:]:   # words[0] is the artificial <root> token
+            w = _DiagramWord()
+            w.id, w.text, w.lemma = uw.id, uw.form, uw.lemma
+            w.upos, w.xpos = uw.upostag, uw.xpostag
+            w.head, w.deprel = uw.head, uw.deprel
+            out.append(w)
+        return out
 
     # ------------------------------------------------------------------ #
     # Meter analysis

@@ -7,7 +7,8 @@ import tkinter.ttk as ttk
 from tkinter import filedialog, messagebox
 import tkinter.font as tkfont
 
-from poetit.linguistics import Linguistics, word_at_cursor, STANZA_AVAILABLE as _STANZA_AVAILABLE
+from poetit.linguistics import (Linguistics, word_at_cursor,
+                                 UDPIPE_AVAILABLE as _UDPIPE_AVAILABLE)
 from poetit import file_io, popups
 from poetit.popups import DIAGRAM_AVAILABLE as _DIAGRAM_AVAILABLE
 
@@ -134,7 +135,9 @@ Definition WordNet definitions for the word at the cursor, grouped by part of
            speech, with synonyms and example sentences.
 
 Diagram    Draws a dependency-parse diagram of the sentence at the cursor,
-           using Stanza. The English model (~500 MB) downloads on first use.
+           using a bundled UDPipe model (no download). Install the optional
+           "quality mode" (Stanza) for more accurate parses — see the
+           Detailed Guide.
 
 Thesaurus  Synonyms for the word at the cursor; click one to replace the word.
 
@@ -231,8 +234,17 @@ Spell       Toggles inline spell-checking, backed by the `pyspellchecker`
             suggestions and click a suggestion to apply it.
 
 Diagram     Draws a dependency-parse diagram of the sentence at the cursor —
-            see section 4. Parsing uses the `stanza` package; its English model
-            (~500 MB) downloads automatically on first use.
+            see section 4. By default this uses a bundled UDPipe English model
+            (no download). For more accurate parses, install the optional
+            "quality mode": Stanza's biaffine parser. It is opt-in because it
+            pulls in PyTorch (~1.7 GB) and downloads its own English model
+            (~500 MB) on first use; install it with
+
+                pip install "poetit[quality]"
+                python -c "import stanza; stanza.download('en', package='ewt')"
+
+            When present, poetit uses Stanza automatically and falls back to the
+            bundled UDPipe model otherwise.
 
 4. THE DEPENDENCY DIAGRAM AND ITS TAG LEGENDS
 ---------------------------------------------
@@ -241,8 +253,9 @@ its dependent and is labelled with the grammatical relation between them; the
 one word that depends on nothing is marked `root`. Below the picture, an
 annotation row repeats each word with its relation and its part of speech.
 
-The annotation follows the Universal Dependencies (UD) scheme as produced by
-Stanza — the same labels used in CoNLL-U treebank files. Two part-of-speech
+The annotation follows the Universal Dependencies (UD) scheme — the same labels
+used in CoNLL-U treebank files — as produced by UDPipe or, in quality mode,
+Stanza. Two part-of-speech
 tag sets appear: the abbreviation printed under each word in the diagram is the
 language-specific Penn Treebank tag (XPOS), while the annotation row shows the
 universal tag (UPOS).
@@ -1553,7 +1566,7 @@ class Editor:
         )
 
     # ------------------------------------------------------------------ #
-    # Dependency diagram (Stanza)
+    # Dependency diagram (UDPipe)
     # ------------------------------------------------------------------ #
 
     def _diagram_click(self):
@@ -1572,8 +1585,8 @@ class Editor:
             cursor = self._last_focus_cursor
         # Assemble the poem exactly as it is written to disk (trailing blank
         # lines dropped, lines joined with newlines) and map the cursor to an
-        # absolute character offset in that text. Stanza segments the whole
-        # poem, so sentences may span line breaks.
+        # absolute character offset in that text. Sentences are segmented over
+        # the whole poem, so they may span line breaks.
         content = [line.get() for line, _ in self.lines]
         while content and not content[-1]:
             content.pop()
@@ -1583,10 +1596,10 @@ class Editor:
             return
         offset = sum(len(line) + 1 for line in content[:row]) \
             + min(cursor, len(raw))
-        if not _STANZA_AVAILABLE:
+        if not _UDPIPE_AVAILABLE:
             messagebox.showerror(
                 "Diagram",
-                "Stanza is not installed.\nRun: pip install stanza"
+                "ufal.udpipe is not installed.\nRun: pip install ufal.udpipe"
             )
             return
         if not _DIAGRAM_AVAILABLE:
@@ -1595,20 +1608,12 @@ class Editor:
                 "resvg_py and Pillow are required for the diagram.\nRun: pip install resvg_py Pillow"
             )
             return
-        if self._nlp.stanza_loading:
-            # Model is loading on startup — retry automatically once ready.
-            self.root.after(500, self._diagram_click)
-            return
-        doc = self._nlp.get_stanza_doc(text)
+        doc = self._nlp.get_diagram_doc(text)
         if doc is None:
-            if self._nlp.stanza_needs_download:
-                self._offer_stanza_download()
-            else:
-                messagebox.showerror(
-                    "Diagram",
-                    "Stanza model failed to load.\n"
-                    "Check your internet connection and restart the application."
-                )
+            messagebox.showerror(
+                "Diagram",
+                "The dependency-parse model could not be loaded."
+            )
             return
         if not doc.sentences:
             messagebox.showinfo("Diagram", "No sentence found to diagram.")
@@ -1620,57 +1625,6 @@ class Editor:
             self.root.winfo_screenheight(),
             sent_index=sent_index,
         )
-
-    def _offer_stanza_download(self):
-        if not messagebox.askyesno(
-            "Download Model",
-            "The Stanza English model hasn't been downloaded yet (~500 MB).\n\n"
-            "Download it now? An internet connection is required.",
-        ):
-            return
-
-        progress = tk.Toplevel(self.root)
-        progress.title("Downloading")
-        progress.resizable(False, False)
-        tk.Label(
-            progress,
-            text="Downloading Stanza English model…\nThis may take a few minutes.",
-            padx=20, pady=20,
-        ).pack()
-        progress.grab_set()
-        progress.update()
-
-        result = [None]
-
-        def do_download():
-            ok = self._nlp.download_stanza_model()
-            if ok:
-                self._nlp._load_stanza_background()
-            result[0] = ok
-
-        def check_done():
-            if result[0] is None:
-                self.root.after(500, check_done)
-                return
-            progress.destroy()
-            if not result[0]:
-                messagebox.showerror(
-                    "Download Failed",
-                    "Failed to download the Stanza model.\n"
-                    "Check your internet connection and try again."
-                )
-                return
-            if self._nlp.stanza_ready:
-                self._diagram_click()
-            else:
-                messagebox.showerror(
-                    "Diagram",
-                    "The model was downloaded but failed to load.\n"
-                    "Please restart the application."
-                )
-
-        threading.Thread(target=do_download, daemon=True).start()
-        self.root.after(500, check_done)
 
     # ------------------------------------------------------------------ #
     # Rhyme scheme column
@@ -3226,7 +3180,7 @@ class Editor:
 
 
 def _sentence_index_at_offset(doc, offset):
-    """Index of the Stanza sentence containing the given character offset.
+    """Index of the parsed sentence containing the given character offset.
 
     Sentence spans come from the parse of the full poem text, so a cursor in
     the whitespace between sentences (or past the last one) selects the last
