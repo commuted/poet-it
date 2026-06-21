@@ -30,13 +30,15 @@ parts:
   poetit:
     plugin: python
     source: .
-    # Pin torch to the CPU-only build: PyPI's torch is a CUDA build that adds
-    # ~4.5 GB poetit can never use. The pin only exists on the pytorch.org CPU
-    # index (PIP_EXTRA_INDEX_URL below). Keep the version in sync with
-    # flatpak/python3-torch-cpu.json.
+    # The snap ships the optional "quality" extra (Stanza) so the dependency
+    # diagram uses the more accurate biaffine parser; the bundled UDPipe model
+    # remains the fallback. Pin torch to the CPU-only build: PyPI's torch is a
+    # CUDA build that adds ~4.5 GB poetit can never use. The pin only exists on
+    # the pytorch.org CPU index (PIP_EXTRA_INDEX_URL below). Keep the version in
+    # sync with flatpak/python3-torch-cpu.json.
     python-packages:
       - torch==2.12.0+cpu
-      - .
+      - .[quality]
     build-environment:
       - PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
     override-pull: |

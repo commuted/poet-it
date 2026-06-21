@@ -12,7 +12,7 @@ depends=(
     'tk'
     'python-nltk'
     'python-prosodic'
-    'python-stanza'
+    'python-ufal-udpipe'
     'python-dulwich'
     'python-resvg-py'
     'python-pillow'
@@ -23,6 +23,12 @@ makedepends=(
     'python-installer'
     'python-wheel'
     'python-setuptools'
+)
+optdepends=(
+    # "quality" extra: more accurate diagram via Stanza's biaffine parser;
+    # pulls PyTorch (~1.7 GB) and downloads its EWT model on first use. Without
+    # it the diagram uses the bundled UDPipe model.
+    'python-stanza: improved dependency-diagram accuracy (quality mode)'
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/commuted/$pkgname/archive/v$pkgver.tar.gz")
 sha256sums=('SKIP')   # replace with actual sha256 before AUR submission

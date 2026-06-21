@@ -1,5 +1,8 @@
+# After editing this file, regenerate python3-requirements.json:
+#   ./flatpak/generate-pip-sources.sh
 nltk>=3.8
 prosodic>=3.0
+ufal.udpipe>=1.3
 stanza>=1.7
 dulwich>=0.22
 resvg_py>=0.3
