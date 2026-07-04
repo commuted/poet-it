@@ -210,6 +210,7 @@ class Linguistics:
         self._spell              = _SpellChecker() if SPELLCHECKER_AVAILABLE else None
         if self._spell is not None:
             self._spell.word_frequency.load_words(_POETIC_WORDS)
+        self._words_corpus       = None   # NLTK words corpus, built on first use
 
     def start_background_loads(self):
         # Warm whichever diagram backend will actually be used: Stanza (quality
@@ -219,6 +220,17 @@ class Linguistics:
         elif UDPIPE_AVAILABLE:
             threading.Thread(target=self._ensure_udpipe_model, daemon=True).start()
         threading.Thread(target=self._load_thesaurus_background, daemon=True).start()
+        if self._spell is not None:
+            threading.Thread(target=self._warm_spell_backups, daemon=True).start()
+
+    def _warm_spell_backups(self):
+        """Preload the backup spell dictionaries off the UI thread; the first
+        WordNet lookup otherwise stalls the first spell scan by ~2 s."""
+        try:
+            self._ensure_words_corpus()
+            self._wordnet_knows('poem')
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ #
     # Syllable counting
@@ -395,6 +407,50 @@ class Linguistics:
     # Spell checking
     # ------------------------------------------------------------------ #
 
+    def _ensure_words_corpus(self):
+        if self._words_corpus is None:
+            try:
+                from nltk.corpus import words as _words
+                self._words_corpus = frozenset(w.lower() for w in _words.words())
+            except Exception:
+                self._words_corpus = frozenset()
+        return self._words_corpus
+
+    @staticmethod
+    def _wordnet_knows(word):
+        try:
+            from nltk.corpus import wordnet as _wn
+            return bool(_wn.synsets(word))
+        except Exception:
+            return False
+
+    def _thesaurus_knows(self, word):
+        # Consult only if the background load has finished; blocking the UI
+        # thread on a multi-megabyte JSON parse is worse than a rare miss.
+        with self._thesaurus_lock:
+            thesaurus = self._thesaurus
+        return bool(thesaurus) and word in thesaurus
+
+    def _known_to_backup_dicts(self, lower):
+        """Fallback lookup for words the primary dictionary rejects.
+
+        Cascades through the other bundled word lists — the CMU pronouncing
+        dictionary, the NLTK words corpus, WordNet, and the thesaurus — so a
+        valid-but-rare word missing from pyspellchecker's frequency list is
+        not underlined. A hit is fed back into the primary dictionary so the
+        word takes the fast path on every later scan.
+        """
+        ascii_form = lower.replace('’', "'")
+        known = (
+            ascii_form in self._cmu
+            or ascii_form in self._ensure_words_corpus()
+            or self._wordnet_knows(ascii_form)
+            or self._thesaurus_knows(ascii_form)
+        )
+        if known:
+            self._spell.word_frequency.load_words([lower])
+        return known
+
     def misspelled_words(self, text):
         """Return the set of lowercase unknown words found in text."""
         if self._spell is None:
@@ -402,7 +458,8 @@ class Linguistics:
         words = re.findall(r"[A-Za-z]+(?:['’][A-Za-z]+)*", text)
         if not words:
             return set()
-        return self._spell.unknown([w.lower() for w in words])
+        unknown = self._spell.unknown([w.lower() for w in words])
+        return {w for w in unknown if not self._known_to_backup_dicts(w)}
 
     def check_spelling(self, word):
         """Return (is_correct, [suggestions]) for word.
@@ -415,6 +472,8 @@ class Linguistics:
         lower = word.lower()
         if not self._spell.unknown([lower]):
             return True, []
+        if self._known_to_backup_dicts(lower):
+            return True, []
         # Contractions and possessives the dictionary may not list as a unit
         # (e.g. "children's"): accept when the stem is a known word and the
         # trailing piece is a standard English enclitic. Common forms such as
@@ -423,7 +482,8 @@ class Linguistics:
             parts = re.split(r"['’]", lower)
             if (len(parts) == 2 and parts[0]
                     and parts[1] in _CONTRACTION_CLITICS
-                    and not self._spell.unknown([parts[0]])):
+                    and (not self._spell.unknown([parts[0]])
+                         or self._known_to_backup_dicts(parts[0]))):
                 return True, []
         candidates = self._spell.candidates(lower) or set()
         candidates.discard(lower)
