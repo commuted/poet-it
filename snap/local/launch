@@ -5,4 +5,11 @@ PYVER=$(ls "$SNAP/lib/" | grep -E '^python3\.[0-9]+$' | sort -V | tail -1)
 export PYTHONPATH="$SNAP/lib/$PYVER/site-packages:$SNAP/usr/lib/$PYVER:$SNAP/usr/lib/$PYVER/lib-dynload"
 export TCL_LIBRARY="$SNAP/usr/share/tcltk/tcl8.6"
 export TK_LIBRARY="$SNAP/usr/share/tcltk/tk8.6"
+# prosodic probes absolute host paths for espeak, which resolve to the bare
+# core24 base inside the snap; point it at the staged copy instead.
+ESPEAK_LIB=$(ls "$SNAP"/usr/lib/*/libespeak-ng.so.1 2>/dev/null | head -1)
+if [ -n "$ESPEAK_LIB" ]; then
+    export PATH_ESPEAK="$ESPEAK_LIB"
+    export ESPEAK_DATA_PATH="${ESPEAK_LIB%/*}"
+fi
 exec "$SNAP/bin/poetit" "$@"

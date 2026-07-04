@@ -144,6 +144,8 @@ Thesaurus  Synonyms for the word at the cursor; click one to replace the word.
 Spell      Toggles inline spell-checking. Misspelled words get a red underline;
            hover one to see suggestions and click to apply.
 
+Recite     Reads the poem aloud (offline, via espeak-ng). Click again to stop.
+
 Versions
 --------
 Make Version  Commits the current poem to the repository with a message
@@ -232,6 +234,10 @@ Thesaurus   Synonyms for the word at the cursor, from a bundled MyThes-format
 Spell       Toggles inline spell-checking, backed by the `pyspellchecker`
             package. Misspelled words gain a red underline; hover one for
             suggestions and click a suggestion to apply it.
+
+Recite      Reads the whole poem aloud with the espeak-ng synthesizer —
+            entirely offline, no accounts or cloud services. The button stays
+            pressed while speaking; click it again to stop mid-poem.
 
 Diagram     Draws a dependency-parse diagram of the sentence at the cursor —
             see section 4. By default this uses a bundled UDPipe English model
@@ -459,6 +465,8 @@ class Editor:
         self._spell_hover_span = None
         self._spell_after_id   = None
         self._spell_close_after_id = None
+        self._recite_var       = tk.BooleanVar(value=False)
+        self._recite_proc      = None
 
         sys_fonts = set(tkfont.families())
         self._avail_fonts = [f for f in _FONT_CANDIDATES if f in sys_fonts]
@@ -783,6 +791,72 @@ class Editor:
             self._spell_popup = None
         self._spell_hover_te = None
         self._spell_hover_span = None
+
+    # ------------------------------------------------------------------ #
+    # Recite: offline text-to-speech via espeak-ng (no services)
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _find_espeak():
+        import shutil
+        for name in ('espeak-ng', 'espeak'):
+            path = shutil.which(name)
+            if path:
+                return path
+        snap = os.environ.get('SNAP')
+        if snap:
+            candidate = os.path.join(snap, 'usr', 'bin', 'espeak-ng')
+            if os.path.exists(candidate):
+                return candidate
+        return None
+
+    def _toggle_recite(self):
+        if self._recite_var.get():
+            self._recite_start()
+        else:
+            self._recite_stop()
+
+    def _recite_start(self):
+        import subprocess
+        text = "\n".join(te.get() for te, _ in self.lines).strip()
+        exe = self._find_espeak()
+        if not exe or not text:
+            self._recite_var.set(False)
+            if not exe:
+                messagebox.showinfo(
+                    "Recite",
+                    "espeak-ng was not found.\n\n"
+                    "Install it with:  sudo apt install espeak-ng",
+                )
+            return
+        # -s 140: recitation pace, slower than espeak's talky default.
+        self._recite_proc = subprocess.Popen(
+            [exe, '-s', '140', '--stdin'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        try:
+            self._recite_proc.stdin.write(text.encode('utf-8'))
+            self._recite_proc.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass
+        self._recite_poll()
+
+    def _recite_poll(self):
+        """Un-press the button when the recitation finishes on its own."""
+        proc = self._recite_proc
+        if proc is None:
+            return
+        if proc.poll() is None:
+            self.root.after(200, self._recite_poll)
+        else:
+            self._recite_proc = None
+            self._recite_var.set(False)
+
+    def _recite_stop(self):
+        proc, self._recite_proc = self._recite_proc, None
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
 
     def _about_click(self):
         popup = tk.Toplevel(self.root)
@@ -1764,6 +1838,14 @@ class Editor:
             indicatoron=False, relief="raised", padx=8, pady=2,
         )
         self._spell_btn.pack(side="left", padx=(0, 6), pady=3)
+
+        self._recite_btn = tk.Checkbutton(
+            tb, text="Recite",
+            variable=self._recite_var,
+            command=self._toggle_recite,
+            indicatoron=False, relief="raised", padx=8, pady=2,
+        )
+        self._recite_btn.pack(side="left", padx=(0, 6), pady=3)
 
         # Spacer to push right-side buttons
         tk.Frame(tb).pack(side="left", fill="x", expand=True)
@@ -2926,6 +3008,7 @@ class Editor:
 
     def _quit(self):
         if self._confirm_discard():
+            self._recite_stop()
             self.root.quit()
 
     # ------------------------------------------------------------------ #
