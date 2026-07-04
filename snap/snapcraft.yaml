@@ -1,5 +1,11 @@
 name: poetit
 adopt-info: poetit   # version is pulled from pyproject.toml by the poetit part
+title: Poetit
+license: MIT
+contact: https://github.com/commuted/poetit/issues
+issues: https://github.com/commuted/poetit/issues
+website: https://github.com/commuted/poetit
+source-code: https://github.com/commuted/poetit
 summary: Desktop poetry editor with meter, rhyme, thesaurus, and version control
 description: |
   Poetit is a line-by-line poetry editor built with Python and tkinter.
