@@ -100,7 +100,7 @@ _DO_SUPPORT = frozenset({'do', 'does', 'did', 'doth', 'dost'})
 _HAVE_AUX   = frozenset({'have', 'has', 'had', 'having', 'hath', 'hadst'})
 
 _NLTK_PACKAGES = [
-    ("tokenizers/punkt", "punkt_tab"),
+    ("tokenizers/punkt_tab", "punkt_tab"),
     ("corpora/words", "words"),
     ("taggers/averaged_perceptron_tagger", "averaged_perceptron_tagger"),
     ("taggers/averaged_perceptron_tagger_eng", "averaged_perceptron_tagger_eng"),
