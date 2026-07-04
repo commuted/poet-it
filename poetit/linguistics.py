@@ -7,17 +7,14 @@ import nltk
 from nltk import word_tokenize
 from nltk.tokenize import SyllableTokenizer
 
-try:
-    import prosodic as _prosodic
-    _PROSODIC_AVAILABLE = True
-except ImportError:
-    _PROSODIC_AVAILABLE = False
+# prosodic and stanza are detected without importing them: both are heavy
+# (stanza pulls torch; together ~4 s) and would run before the splash can
+# paint. The real imports happen lazily in the functions that use them,
+# which the app only reaches from its post-splash background threads.
+from importlib.util import find_spec
 
-try:
-    import stanza as _stanza
-    STANZA_AVAILABLE = True
-except ImportError:
-    STANZA_AVAILABLE = False
+_PROSODIC_AVAILABLE = find_spec("prosodic") is not None
+STANZA_AVAILABLE = find_spec("stanza") is not None
 
 try:
     from ufal.udpipe import (Model as _UDModel, Sentence as _UDSentence,
@@ -534,6 +531,7 @@ class Linguistics:
         pipeline = None
         if self._stanza_model_on_disk():
             try:
+                import stanza as _stanza
                 pipeline = _stanza.Pipeline(
                     'en',
                     package=self._STANZA_PACKAGE,
@@ -789,6 +787,7 @@ class Linguistics:
         if not _PROSODIC_AVAILABLE or not text.strip():
             return None
         try:
+            import prosodic as _prosodic
             t = _prosodic.Text(text)
             t.parse()
             if not t.lines:

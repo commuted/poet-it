@@ -3367,6 +3367,15 @@ def main():
 
     root.after(40, _poll)
     root.mainloop()
+    # prosodic's hashstash forks a multiprocessing.Manager server that inherits
+    # every fd, including the X connection: left running, it keeps the closed
+    # window alive (frozen) on screen indefinitely, so kill children explicitly.
+    # Then skip the rest of interpreter teardown: torch/stanza/prosodic atexit
+    # machinery takes over a second, and all saves happen before mainloop ends.
+    import multiprocessing
+    for child in multiprocessing.active_children():
+        child.terminate()
+    os._exit(0)
 
 
 if __name__ == "__main__":
