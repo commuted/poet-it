@@ -458,6 +458,7 @@ class Editor:
         self._spell_hover_te   = None
         self._spell_hover_span = None
         self._spell_after_id   = None
+        self._spell_close_after_id = None
 
         sys_fonts = set(tkfont.families())
         self._avail_fonts = [f for f in _FONT_CANDIDATES if f in sys_fonts]
@@ -579,12 +580,14 @@ class Editor:
             self._spell_scan_row(te)
             self._spell_create_underline(te)
             te.bind('<Motion>', lambda e, t=te: self._spell_on_motion(t, e))
+            te.bind('<Leave>',  lambda e: self._spell_schedule_close())
 
     def _spell_deactivate(self):
-        self._spell_close_popup(warp_to_safety=False)
+        self._spell_close_popup()
         for te, _ in self.lines:
             self._spell_destroy_underline(te)
             te.unbind('<Motion>')
+            te.unbind('<Leave>')
         self._spell_errors.clear()
         self._spell_hover_te = None
         self._spell_hover_span = None
@@ -610,7 +613,7 @@ class Editor:
         uc.tk.call('raise', uc._w, te._w)
         def _uc_click(e, t=te):
             if self._spell_popup is not None:
-                self._spell_close_popup(warp_to_safety=False)
+                self._spell_close_popup()
             t.focus_set()
             try:
                 t.icursor(t.index(f'@{e.x}'))
@@ -662,8 +665,9 @@ class Editor:
         if hover_word:
             span = (hover_word[1], hover_word[2])
             if self._spell_hover_te is te and self._spell_hover_span == span:
+                self._spell_cancel_close()   # back over the word: keep the popup
                 return
-            self._spell_close_popup(warp_to_safety=False)
+            self._spell_close_popup()
             self._spell_hover_te = te
             self._spell_hover_span = span
             if self._spell_after_id:
@@ -675,11 +679,13 @@ class Editor:
             if self._spell_after_id:
                 self.root.after_cancel(self._spell_after_id)
                 self._spell_after_id = None
-            # If a popup is already showing, let its own <Leave> handler close it.
-            # Do NOT close it from here — that would race with the cursor warp.
             if self._spell_popup is None:
                 self._spell_hover_te = None
                 self._spell_hover_span = None
+            else:
+                # Pointer wandered off the word; leave a grace period to reach
+                # the pull-down before closing.
+                self._spell_schedule_close()
 
     def _spell_show_popup(self, te, hover_word):
         word, start, end, suggestions = hover_word
@@ -720,7 +726,7 @@ class Editor:
             ).pack(anchor='w', pady=(2, 0))
             for sug in suggestions[:8]:
                 def _apply(s=sug, r=row, st=start, en=end):
-                    self._spell_close_popup(warp_to_safety=False)
+                    self._spell_close_popup()
                     self._insert_word(s, r, st, en)
                     if self._spell_var.get() and r is not None and r < len(self.lines):
                         self._spell_scan_row(self.lines[r][0])
@@ -739,44 +745,33 @@ class Editor:
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
         px = max(10, min(word_sx, sw - pw - 10))
-        py = word_sy + te_h + 4
+        py = word_sy + te_h   # adjacent to the row: no dead zone on the way in
         if py + ph > sh - 10:
-            py = word_sy - ph - 4
+            py = word_sy - ph
         popup.geometry(f'{pw}x{ph}+{px}+{py}')
         popup.lift()
-        popup.update()   # commit geometry so the window is mapped before warp
+        # A toplevel binding fires for all its descendants, so moving between
+        # the suggestion buttons raises Leave/Enter pairs; the grace-period
+        # close plus its cancel on Enter absorb them.
+        popup.bind('<Enter>', lambda e: self._spell_cancel_close())
+        popup.bind('<Leave>', lambda e: self._spell_schedule_close())
 
-        def _on_leave(event):
-            try:
-                under = self.root.winfo_containing(event.x_root, event.y_root)
-            except tk.TclError:
-                under = None
-            if under is not None:
-                w = under
-                while w is not None:
-                    if str(w) == str(popup):
-                        return
-                    try:
-                        w = w.master
-                    except AttributeError:
-                        break
-            self._spell_close_popup(warp_to_safety=True, hover_te=te)
+    def _spell_schedule_close(self, delay=350):
+        """Close the popup after a grace period. Crossing widget borders on
+        the way into the pull-down (row edge, underline bar, button gaps)
+        must not kill it; anything that re-enters the word or the popup
+        cancels the pending close."""
+        self._spell_cancel_close()
+        if self._spell_popup is not None:
+            self._spell_close_after_id = self.root.after(delay, self._spell_close_popup)
 
-        def _warp_and_arm():
-            if self._spell_popup is not popup:
-                return
-            # Warp cursor into popup center (popup-local coordinates)
-            try:
-                popup.event_generate('<Motion>', warp=True, x=pw // 2, y=ph // 2)
-            except tk.TclError:
-                pass
-            # Arm <Leave> after the warp has settled
-            popup.after(150, lambda: popup.bind('<Leave>', _on_leave) if self._spell_popup is popup else None)
+    def _spell_cancel_close(self):
+        if self._spell_close_after_id:
+            self.root.after_cancel(self._spell_close_after_id)
+            self._spell_close_after_id = None
 
-        # Small delay so the window is fully visible on-screen before warping
-        popup.after(50, _warp_and_arm)
-
-    def _spell_close_popup(self, warp_to_safety=False, hover_te=None):
+    def _spell_close_popup(self):
+        self._spell_cancel_close()
         if self._spell_after_id:
             self.root.after_cancel(self._spell_after_id)
             self._spell_after_id = None
@@ -788,18 +783,6 @@ class Editor:
             self._spell_popup = None
         self._spell_hover_te = None
         self._spell_hover_span = None
-        if warp_to_safety and hover_te is not None:
-            try:
-                row    = self._row_of(hover_te)
-                target = max(0, (row or 0) - 2)
-                tgt_te = self.lines[target][0] if target < len(self.lines) else hover_te
-                tgt_te.event_generate(
-                    '<Motion>', warp=True,
-                    x=tgt_te.winfo_width() // 2,
-                    y=tgt_te.winfo_height() // 2,
-                )
-            except Exception:
-                pass
 
     def _about_click(self):
         popup = tk.Toplevel(self.root)
@@ -2095,6 +2078,7 @@ class Editor:
             self._spell_scan_row(te)
             self._spell_create_underline(te)
             te.bind('<Motion>', lambda e, t=te: self._spell_on_motion(t, e))
+            te.bind('<Leave>',  lambda e: self._spell_schedule_close())
 
     def _add_row(self, text=""):
         row = len(self.lines)
@@ -2309,7 +2293,7 @@ class Editor:
         self._clear_row_selection()
         # Close spell popup so the user can edit manually.
         if self._spell_popup is not None:
-            self._spell_close_popup(warp_to_safety=False)
+            self._spell_close_popup()
         # Free-form horizontal placement: when the click lands past the end of
         # the line's text, pad with spaces so the cursor can begin at the
         # clicked column — the mouse counterpart to the arrow-key virtual
