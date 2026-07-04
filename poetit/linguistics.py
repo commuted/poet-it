@@ -744,7 +744,7 @@ class Linguistics:
         word_tokens = re.findall(r'[A-Za-z]+', text)
         if not word_tokens:
             return []
-        doc = self.get_stanza_doc(text)
+        doc = self.get_diagram_doc(text)
         if doc is not None:
             stanza_words = [
                 (w.text, w.xpos or 'NN', w.deprel or '')
