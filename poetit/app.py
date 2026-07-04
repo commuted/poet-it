@@ -3259,9 +3259,48 @@ def setup_linux_desktop():
           " for the launcher icon to update.")
 
 
+def _shield_x_connection():
+    """Close the inherited X socket in every forked child.
+
+    Forked helpers (hashstash's Manager server, the multiprocessing resource
+    tracker, pool workers) inherit the X connection fd; any of them outliving
+    the app — a crash, a kill, a missed terminate — keeps the closed window
+    alive on screen as an unresponsive ghost the window manager still lists
+    as a running instance. Severing the fd at fork time ends that no matter
+    how the child was created or how it dies. Linux/X11 only by construction
+    (/proc scan, register_at_fork); silently a no-op elsewhere.
+    """
+    import socket
+    x_fds = []
+    try:
+        for name in os.listdir('/proc/self/fd'):
+            try:
+                s = socket.socket(fileno=os.dup(int(name)))
+            except OSError:
+                continue
+            try:
+                if 'X11-unix' in str(s.getpeername()):
+                    x_fds.append(int(name))
+            except OSError:
+                pass
+            finally:
+                s.close()
+    except (OSError, AttributeError):
+        return
+    if x_fds and hasattr(os, 'register_at_fork'):
+        def _close_in_child(fds=tuple(x_fds)):
+            for fd in fds:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+        os.register_at_fork(after_in_child=_close_in_child)
+
+
 def main():
     root = tk.Tk(className="Poetit")
     root.withdraw()
+    _shield_x_connection()
 
     _icon = _load_icon(master=root)
     if _icon:
