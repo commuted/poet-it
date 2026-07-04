@@ -1,6 +1,8 @@
 #!/bin/sh
 PYVER=$(ls "$SNAP/lib/" | grep -E '^python3\.[0-9]+$' | sort -V | tail -1)
-export PYTHONPATH="$SNAP/lib/$PYVER/site-packages"
+# usr/lib/$PYVER holds the staged python3-tk (tkinter + _tkinter in
+# lib-dynload); the core24 base python has no tkinter of its own.
+export PYTHONPATH="$SNAP/lib/$PYVER/site-packages:$SNAP/usr/lib/$PYVER:$SNAP/usr/lib/$PYVER/lib-dynload"
 export TCL_LIBRARY="$SNAP/usr/share/tcltk/tcl8.6"
 export TK_LIBRARY="$SNAP/usr/share/tcltk/tk8.6"
 exec "$SNAP/bin/poetit" "$@"
