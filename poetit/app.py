@@ -2087,7 +2087,7 @@ class Editor:
         self._bind_row(te, "<Command-X>",  self._cut)
         self._bind_row(te, "<Shift-Up>",   self._shift_up)
         self._bind_row(te, "<Shift-Down>", self._shift_down)
-        self._bind_row(te, "<Button-1>",   self._on_click)
+        te.bind("<Button-1>", self._on_click)
 
     def _spell_attach(self, te):
         """When spell mode is on, scan, underline and hover-bind a row widget."""
@@ -2298,16 +2298,33 @@ class Editor:
             self.lines[new_focus][0].focus_set()
         return "break"
 
-    def _on_click(self, row):
+    def _on_click(self, event):
+        row = self._row_of(event.widget)
+        if row is None:
+            return None
         # Record click row for distinguishing single-line vs multi-line drag.
         self._click_row = row
         te = self.lines[row][0]
-        self._click_index = te.index(tk.INSERT)
         # Clear any existing row selection on new click.
         self._clear_row_selection()
         # Close spell popup so the user can edit manually.
         if self._spell_popup is not None:
             self._spell_close_popup(warp_to_safety=False)
+        # Free-form horizontal placement: when the click lands past the end of
+        # the line's text, pad with spaces so the cursor can begin at the
+        # clicked column — the mouse counterpart to the arrow-key virtual
+        # canvas. Padding is trimmed on every save/version, so it never reaches
+        # disk. (Columns assume the editor's monospace font via self._char_w.)
+        text = te.get()
+        target_col = round(event.x / self._char_w) if self._char_w else 0
+        if target_col > len(text):
+            te.focus_set()
+            te.insert(tk.END, ' ' * (target_col - len(text)))
+            te.icursor(target_col)
+            self._click_index = target_col
+            return "break"
+        self._click_index = te.index(tk.INSERT)
+        return None
 
     def _on_drag(self, event):
         try:
