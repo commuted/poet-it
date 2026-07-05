@@ -6,8 +6,9 @@ command: poetit
 
 finish-args:
   - --share=ipc
-  - --socket=fallback-x11
-  - --socket=wayland
+  # Tk has no Wayland backend: it needs X11 (XWayland) unconditionally.
+  # fallback-x11 would leave a Wayland session with no display at all.
+  - --socket=x11
   # Narrow, reviewer-friendly scope: only the dirs the app actually uses, each
   # created on first launch. The app reaches everything through
   # os.path.expanduser("~"), which is the real home under flatpak.
