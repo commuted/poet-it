@@ -70,6 +70,7 @@ include = ["poetit", "poetit.*"]
     "data/*.json",
     "data/*.dict",
     "data/*.png",
+    "data/*.jpg",
     "data/*.desktop",
     "data/*.txt",
     "data/*.udpipe",

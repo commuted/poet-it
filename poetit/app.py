@@ -3474,20 +3474,19 @@ def main():
     splash = tk.Toplevel(root)
     splash.overrideredirect(True)
 
-    # Load splash image.
+    # Load splash image from package data so installed builds (wheel, snap,
+    # flatpak) show it too, not just source checkouts.
     _splash_img = None
-    img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            '..', 'ICD9N.jpg')
-    if not os.path.exists(img_path):
-        img_path = os.path.join(os.getcwd(), 'ICD9N.jpg')
-    if os.path.exists(img_path):
-        try:
-            from PIL import Image as _PILImage, ImageTk as _PILImageTk
-            _splash_img = _PILImageTk.PhotoImage(
-                _PILImage.open(img_path).resize((480, 320), _PILImage.LANCZOS),
-                master=splash)
-        except Exception:
-            _splash_img = None
+    try:
+        import io as _io
+        from importlib.resources import files as _files
+        from PIL import Image as _PILImage, ImageTk as _PILImageTk
+        _raw = _files('poetit').joinpath('data', 'ICD9N.jpg').read_bytes()
+        _splash_img = _PILImageTk.PhotoImage(
+            _PILImage.open(_io.BytesIO(_raw)).resize((480, 320), _PILImage.LANCZOS),
+            master=splash)
+    except Exception:
+        _splash_img = None
 
     # Layout: image on top, status + bar below.
     if _splash_img:
