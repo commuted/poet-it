@@ -912,7 +912,9 @@ class Editor:
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         try:
-            self._recite_proc.stdin.write(text.encode('utf-8'))
+            # Trailing newline required: espeak clips the final clause when
+            # stdin ends mid-line (verified: ~1.4 kB of audio lost without it).
+            self._recite_proc.stdin.write((text + '\n').encode('utf-8'))
             self._recite_proc.stdin.close()
         except (BrokenPipeError, OSError):
             pass
@@ -1918,10 +1920,21 @@ class Editor:
         # Spacer to push right-side buttons
         tk.Frame(tb).pack(side="left", fill="x", expand=True)
 
+        # Packed first among the right-side widgets, so it takes the far
+        # right edge — in a narrow window the flexible gap collapses and a
+        # mid-cluster position is indistinguishable from the left group.
+        self._recite_btn = tk.Checkbutton(
+            tb, text="Recite",
+            variable=self._recite_var,
+            command=self._toggle_recite,
+            indicatoron=False, relief="raised", padx=8, pady=2,
+        )
+        self._recite_btn.pack(side="right", padx=6, pady=3)
+
         tk.Button(
             tb, text="About", command=self._about_click,
             relief="raised", padx=8, pady=2,
-        ).pack(side="right", padx=6, pady=3)
+        ).pack(side="right", padx=(0, 6), pady=3)
 
         tk.Button(
             tb, text="Make Version", command=self._version_click,
@@ -1932,15 +1945,6 @@ class Editor:
             tb, text="Version Tree", command=self._tree_click,
             relief="raised", padx=8, pady=2,
         ).pack(side="right", padx=(0, 6), pady=3)
-
-        # Right-aligned, set off from the version cluster by a wider gap.
-        self._recite_btn = tk.Checkbutton(
-            tb, text="Recite",
-            variable=self._recite_var,
-            command=self._toggle_recite,
-            indicatoron=False, relief="raised", padx=8, pady=2,
-        )
-        self._recite_btn.pack(side="right", padx=(0, 18), pady=3)
 
         # --- Editor area ---
         outer = tk.Frame(self.root)
