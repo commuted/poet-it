@@ -1,6 +1,6 @@
 app-id: io.github.commuted.poetit
 runtime: org.gnome.Platform
-runtime-version: '48'
+runtime-version: '50'
 sdk: org.gnome.Sdk
 command: poetit
 
@@ -16,12 +16,94 @@ finish-args:
   - --filesystem=~/nltk_data:create          # NLTK data cache
   - --filesystem=~/stanza_resources:create   # Stanza model cache
   - --share=network          # Stanza downloads its English model on first launch
+  - --socket=pulseaudio      # Recite (espeak-ng speech synthesis)
   - --device=dri
   # Points at a build-time symlink (created in the poetit module) rather than a
   # hardcoded python3.XX dir, so this survives a runtime Python minor bump.
   - --env=PYTHONPATH=/app/lib/python3-site
+  # prosodic probes host paths for espeak, which don't exist in the sandbox;
+  # point it at the bundled library (also used by the Recite button's CLI).
+  - --env=PATH_ESPEAK=/app/lib/libespeak-ng.so.1
 
 modules:
+  # The runtime python ships no tkinter: build Tcl/Tk, then compile CPython's
+  # _tkinter against them and install the tkinter package into site-packages.
+  # The CPython source version must match the runtime python (asserted below).
+  - name: tcl
+    buildsystem: autotools
+    subdir: unix
+    post-install:
+      # tcl installs its library read-only, which breaks the debug-strip step
+      - chmod 755 /app/lib/libtcl8.6.so
+    sources:
+      - type: archive
+        url: https://downloads.sourceforge.net/tcl/tcl8.6.14-src.tar.gz
+        sha256: 5880225babf7954c58d4fb0f5cf6279104ce1cd6aa9b71e9a6322540e1c4de66
+    cleanup:
+      - /man
+
+  - name: tk
+    buildsystem: autotools
+    subdir: unix
+    post-install:
+      - chmod 755 /app/lib/libtk8.6.so
+    sources:
+      - type: archive
+        url: https://downloads.sourceforge.net/tcl/tk8.6.14-src.tar.gz
+        sha256: 8ffdb720f47a6ca6107eac2dd877e30b0ef7fac14f3a84ebbd0b3612cee41a94
+    cleanup:
+      - /man
+
+  - name: python3-tkinter
+    buildsystem: simple
+    build-commands:
+      - |
+        set -e
+        PYVER=$(python3 -c 'import sys; print("%d.%d.%d" % sys.version_info[:3])')
+        test "$PYVER" = "3.13.14" || { echo "runtime python is $PYVER but the CPython source below is 3.13.14 — update the source"; exit 1; }
+        SITE=/app/lib/python${PYVER%.*}/site-packages
+        mkdir -p "$SITE"
+        cp -r Lib/tkinter "$SITE/"
+        EXT=$(python3 -c 'import sysconfig; print(sysconfig.get_config_var("EXT_SUFFIX"))')
+        # _tkinter.c uses CPython-internal headers since 3.13; the source
+        # tree is asserted to match the runtime, so this stays ABI-safe.
+        gcc -shared -fPIC $(python3-config --includes) -I/app/include \
+            -IInclude -IInclude/internal -DPy_BUILD_CORE_MODULE=1 \
+            -DWITH_APPINIT=1 Modules/_tkinter.c Modules/tkappinit.c \
+            -L/app/lib -ltcl8.6 -ltk8.6 -o "$SITE/_tkinter$EXT"
+        PYTHONPATH="$SITE" python3 -c 'import tkinter; print("tkinter OK", tkinter.TkVersion)'
+    sources:
+      - type: archive
+        url: https://www.python.org/ftp/python/3.13.14/Python-3.13.14.tgz
+        sha256: 5ae535a36af0ebca6fca176ecb8197f5db9c1cb8c8f0cd12cdf1787046db1f41
+
+  # espeak-ng serves prosodic (phonetics for out-of-lexicon words, via
+  # PATH_ESPEAK) and the Recite button (CLI + pulseaudio playback through
+  # pcaudiolib).
+  - name: pcaudiolib
+    buildsystem: autotools
+    sources:
+      - type: archive
+        url: https://github.com/espeak-ng/pcaudiolib/archive/refs/tags/1.3.tar.gz
+        sha256: 86edb75048eec7fcd8d74f9568f051d50b4781982215095b96ba9c2c9c7c159b
+
+  - name: espeak-ng
+    buildsystem: autotools
+    config-opts:
+      - --without-klatt
+      - --without-speechplayer
+      - --without-mbrola
+    build-options:
+      # the tag archive's autogen/make are not parallel-safe
+      no-parallel-make: true
+    sources:
+      - type: archive
+        url: https://github.com/espeak-ng/espeak-ng/archive/refs/tags/1.52.0.tar.gz
+        sha256: bb4338102ff3b49a81423da8a1a158b420124b055b60fa76cfb4b18677130a23
+    cleanup:
+      - /share/man
+      - /share/vim
+
   # CPU-only torch must install first: it satisfies stanza's torch>=1.13
   # requirement so the generated modules below never pull the CUDA build.
   - python3-torch-cpu.json
@@ -35,8 +117,6 @@ modules:
     buildsystem: simple
     build-commands:
       - pip3 install --no-build-isolation --no-deps --no-cache-dir --prefix=${FLATPAK_DEST} .
-      - install -Dm644 poetit/data/icon.png
-          /app/share/icons/hicolor/256x256/apps/io.github.commuted.poetit.png
       - install -Dm644 flatpak/io.github.commuted.poetit.desktop
           /app/share/applications/io.github.commuted.poetit.desktop
       - install -Dm644 flatpak/io.github.commuted.poetit.metainfo.xml
@@ -51,6 +131,9 @@ modules:
         python3 scripts/trim_nlp_footprint.py --site-packages="$SITE" --expect-cpu
         PYTHONPATH="$SITE" python3 -c "import torch; torch.zeros(2).sum(); import stanza.pipeline.core; import stanza.resources.common"
         ln -snf "$SITE" ${FLATPAK_DEST}/lib/python3-site
+        # The source icon is 784x783; flatpak export caps icons at 512x512.
+        mkdir -p /app/share/icons/hicolor/256x256/apps
+        PYTHONPATH="$SITE" python3 -c "from PIL import Image; Image.open('poetit/data/icon.png').resize((256, 256), Image.LANCZOS).save('/app/share/icons/hicolor/256x256/apps/io.github.commuted.poetit.png')"
     sources:
       # For local builds use: type: dir, path: ..
       # For Flathub replace with a git tag + commit:
