@@ -157,7 +157,8 @@ Thesaurus  Synonyms for the word at the cursor; click one to replace the word.
 Spell      Toggles inline spell-checking. Misspelled words get a red underline;
            hover one to see suggestions and click to apply.
 
-Recite     Reads the poem aloud (offline, via espeak-ng). Click again to stop.
+Recite     On the menu bar, right of Help: reads the poem aloud (offline, via
+           espeak-ng). While speaking it reads Stop; click to interrupt.
 
 Versions
 --------
@@ -248,9 +249,10 @@ Spell       Toggles inline spell-checking, backed by the `pyspellchecker`
             package. Misspelled words gain a red underline; hover one for
             suggestions and click a suggestion to apply it.
 
-Recite      Reads the whole poem aloud with the espeak-ng synthesizer —
-            entirely offline, no accounts or cloud services. The button stays
-            pressed while speaking; click it again to stop mid-poem.
+Recite      A menu-bar entry to the right of Help. Reads the whole poem aloud
+            with the espeak-ng synthesizer — entirely offline, no accounts or
+            cloud services. While speaking the entry reads Stop; click it to
+            interrupt mid-poem.
 
             The voice is configurable in ~/.poetit/state.json, under
             "recite" (written with its defaults on first use):
@@ -837,11 +839,20 @@ class Editor:
                 return candidate
         return None
 
-    def _toggle_recite(self):
-        if self._recite_var.get():
-            self._recite_start()
-        else:
+    def _menu_recite_click(self):
+        if self._recite_proc is not None:
             self._recite_stop()
+        else:
+            self._recite_var.set(True)
+            self._recite_start()
+        self._sync_recite_menu()
+
+    def _sync_recite_menu(self):
+        label = "Stop" if self._recite_proc is not None else "Recite"
+        try:
+            self._menubar.entryconfigure(self._recite_menu_index, label=label)
+        except (tk.TclError, AttributeError):
+            pass
 
     def _recite_settings(self):
         """The "recite" block of state.json over _RECITE_DEFAULTS.
@@ -930,11 +941,14 @@ class Editor:
         else:
             self._recite_proc = None
             self._recite_var.set(False)
+            self._sync_recite_menu()
 
     def _recite_stop(self):
         proc, self._recite_proc = self._recite_proc, None
         if proc is not None and proc.poll() is None:
             proc.terminate()
+        self._recite_var.set(False)
+        self._sync_recite_menu()
 
     def _about_click(self):
         popup = tk.Toplevel(self.root)
@@ -1920,21 +1934,10 @@ class Editor:
         # Spacer to push right-side buttons
         tk.Frame(tb).pack(side="left", fill="x", expand=True)
 
-        # Packed first among the right-side widgets, so it takes the far
-        # right edge — in a narrow window the flexible gap collapses and a
-        # mid-cluster position is indistinguishable from the left group.
-        self._recite_btn = tk.Checkbutton(
-            tb, text="Recite",
-            variable=self._recite_var,
-            command=self._toggle_recite,
-            indicatoron=False, relief="raised", padx=8, pady=2,
-        )
-        self._recite_btn.pack(side="right", padx=6, pady=3)
-
         tk.Button(
             tb, text="About", command=self._about_click,
             relief="raised", padx=8, pady=2,
-        ).pack(side="right", padx=(0, 6), pady=3)
+        ).pack(side="right", padx=6, pady=3)
 
         tk.Button(
             tb, text="Make Version", command=self._version_click,
@@ -2030,6 +2033,11 @@ class Editor:
         menu.add_command(label="    ", state="disabled")
         menu.add_command(label="    ", state="disabled")
         menu.add_cascade(label="Help", menu=help_menu)
+        # Recite lives on the menu bar, right of Help: the button toolbar is
+        # crowded, and a menubar command entry works like a push button. Its
+        # label flips to Stop while a recitation is playing.
+        menu.add_command(label="Recite", command=self._menu_recite_click)
+        self._recite_menu_index = menu.index("end")
         # Right-aligned, non-interactive indicator showing the active repository
         # location. Darkened from the default disabled grey so it stays legible.
         menu.add_command(state="disabled")
