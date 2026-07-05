@@ -1,5 +1,5 @@
 name: poetit
-adopt-info: poetit   # version is pulled from pyproject.toml by the poetit part
+version: "0.1.0"   # keep in sync with pyproject.toml [project].version
 title: Poetit
 license: MIT
 contact: https://github.com/commuted/poetit/issues
@@ -48,10 +48,6 @@ parts:
       - .[quality]
     build-environment:
       - PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
-    override-pull: |
-      craftctl default
-      # Single source of truth for the version: pyproject.toml [project].version
-      craftctl set version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
     override-build: |
       craftctl default
       # Strip stanza/torch files poetit can never execute (headers, bundled
