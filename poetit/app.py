@@ -1910,14 +1910,6 @@ class Editor:
         )
         self._spell_btn.pack(side="left", padx=(0, 6), pady=3)
 
-        self._recite_btn = tk.Checkbutton(
-            tb, text="Recite",
-            variable=self._recite_var,
-            command=self._toggle_recite,
-            indicatoron=False, relief="raised", padx=8, pady=2,
-        )
-        self._recite_btn.pack(side="left", padx=(0, 6), pady=3)
-
         # Spacer to push right-side buttons
         tk.Frame(tb).pack(side="left", fill="x", expand=True)
 
@@ -1935,6 +1927,15 @@ class Editor:
             tb, text="Version Tree", command=self._tree_click,
             relief="raised", padx=8, pady=2,
         ).pack(side="right", padx=(0, 6), pady=3)
+
+        # Right-aligned, set off from the version cluster by a wider gap.
+        self._recite_btn = tk.Checkbutton(
+            tb, text="Recite",
+            variable=self._recite_var,
+            command=self._toggle_recite,
+            indicatoron=False, relief="raised", padx=8, pady=2,
+        )
+        self._recite_btn.pack(side="right", padx=(0, 18), pady=3)
 
         # --- Editor area ---
         outer = tk.Frame(self.root)
