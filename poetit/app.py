@@ -1983,12 +1983,16 @@ class Editor:
         menu = tk.Frame(self.root, bd=1, relief="raised")
         menu.grid(row=0, column=0, sticky="ew")
 
-        def _pulldown(label, submenu):
-            mb = tk.Menubutton(menu, text=label, menu=submenu, padx=10, pady=3)
+        def _pulldown(label):
+            # Tk only posts a menubutton's menu if the menu is a child of
+            # the menubutton itself, so create it there and hand it back.
+            mb = tk.Menubutton(menu, text=label, padx=10, pady=3)
             mb.pack(side="left")
-            return mb
+            m = tk.Menu(mb, tearoff=0)
+            mb.config(menu=m)
+            return m
 
-        fm = tk.Menu(menu, tearoff=0)
+        fm = _pulldown("File")
         fm.add_command(label="New",      command=self._new)
         fm.add_command(label="Open…",    command=self._open)
         fm.add_separator()
@@ -2001,37 +2005,29 @@ class Editor:
         fm.add_command(label="Export…",  command=self._export)
         fm.add_separator()
         fm.add_command(label="Exit",     command=self._quit)
-        _pulldown("File", fm)
-
-        font_menu = tk.Menu(menu, tearoff=0)
+        font_menu = _pulldown("Font")
         for fname in self._avail_fonts:
             font_menu.add_radiobutton(label=fname, variable=self._font_var,
                                       value=fname, command=self._apply_font)
-        _pulldown("Font", font_menu)
-
-        size_menu = tk.Menu(menu, tearoff=0)
+        size_menu = _pulldown("Size")
         for sz in SIZES:
             size_menu.add_radiobutton(label=str(sz), variable=self._size_var,
                                       value=sz, command=self._apply_font)
-        _pulldown("Size", size_menu)
-
-        self._theme_light_menu = tk.Menu(menu, tearoff=0)
-        self._theme_dark_menu  = tk.Menu(menu, tearoff=0)
-        theme_menu = tk.Menu(menu, tearoff=0)
+        theme_menu = _pulldown("Theme")
+        # Cascade submenus likewise must be descendants of their parent menu.
+        self._theme_light_menu = tk.Menu(theme_menu, tearoff=0)
+        self._theme_dark_menu  = tk.Menu(theme_menu, tearoff=0)
         theme_menu.add_cascade(label="Light", menu=self._theme_light_menu)
         theme_menu.add_cascade(label="Dark",  menu=self._theme_dark_menu)
         theme_menu.add_separator()
         theme_menu.add_command(label="Edit Themes…", command=self._edit_themes_dialog)
-        _pulldown("Theme", theme_menu)
         self._rebuild_theme_menus()
 
-        help_menu = tk.Menu(menu, tearoff=0)
+        help_menu = _pulldown("Help")
         help_menu.add_command(label="Long Help",    command=self._help_long)
         help_menu.add_command(label="Concise Help", command=self._help_concise)
         help_menu.add_command(label="Online Help",  command=self._help_pdf)
         help_menu.add_command(label="Support",      command=self._help_support)
-        _pulldown("Help", help_menu)
-
         # Far right of the pull-down line: a real raised button, out of the
         # crowded toolbar. Pressed while a recitation plays; auto-releases.
         self._recite_btn = tk.Checkbutton(
