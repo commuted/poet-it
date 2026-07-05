@@ -29,6 +29,17 @@ INITIAL_LINES = 50
 DEFAULT_FONT  = "Courier"
 DEFAULT_SIZE  = 12
 
+# Recite defaults, seeded into state.json's "recite" block on first use so
+# the knobs are discoverable there. voice/variant ids come from
+# `espeak-ng --voices=en` and espeak-ng-data/voices/!v respectively.
+_RECITE_DEFAULTS = {
+    "voice":     "en-gb-x-rp",  # espeak-ng voice id
+    "variant":   "",            # timbre overlay, e.g. "f3", "whisper"
+    "speed":     140,           # words per minute
+    "pitch":     None,          # 0-99 (espeak default 50)
+    "amplitude": None,          # 0-200 (espeak default 100)
+}
+
 
 def _default_poems_dir() -> str:
     """Return ~/Documents/Poetit, creating it if absent."""
@@ -237,9 +248,18 @@ Spell       Toggles inline spell-checking, backed by the `pyspellchecker`
 
 Recite      Reads the whole poem aloud with the espeak-ng synthesizer —
             entirely offline, no accounts or cloud services. The button stays
-            pressed while speaking; click it again to stop mid-poem. The
-            default voice is British Received Pronunciation; set POETIT_VOICE
-            to any id from `espeak-ng --voices=en` to change it.
+            pressed while speaking; click it again to stop mid-poem.
+
+            The voice is configurable in ~/.poetit/state.json, under
+            "recite" (written with its defaults on first use):
+              voice      espeak-ng voice id — `espeak-ng --voices=en`
+              variant    timbre overlay from espeak-ng-data/voices/!v,
+                         e.g. "f3", "m5", "whisper"
+              speed      words per minute (default 140)
+              pitch      0-99 (null = espeak's default, 50)
+              amplitude  0-200 (null = espeak's default, 100)
+            The POETIT_VOICE environment variable, if set, overrides the
+            configured voice+variant.
 
 Diagram     Draws a dependency-parse diagram of the sentence at the cursor —
             see section 4. By default this uses a bundled UDPipe English model
@@ -818,6 +838,56 @@ class Editor:
         else:
             self._recite_stop()
 
+    def _recite_settings(self):
+        """The "recite" block of state.json over _RECITE_DEFAULTS.
+
+        Seeds the block with its defaults when absent so the parameters are
+        discoverable by opening the file; user edits are never overwritten.
+        """
+        cfg = dict(_RECITE_DEFAULTS)
+        state = {}
+        try:
+            with open(_STATE_FILE, "r", encoding="utf-8") as f:
+                state = json.load(f)
+        except Exception:
+            state = {}
+        saved = state.get("recite")
+        if isinstance(saved, dict):
+            cfg.update(saved)
+        else:
+            state["recite"] = dict(_RECITE_DEFAULTS)
+            try:
+                os.makedirs(_STATE_DIR, exist_ok=True)
+                fd, tmp = tempfile.mkstemp(dir=_STATE_DIR, suffix=".tmp")
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(state, f, indent=2)
+                os.replace(tmp, _STATE_FILE)
+            except Exception:
+                pass
+        return cfg
+
+    def _recite_command(self, exe):
+        """Build the espeak-ng argv from settings.
+
+        POETIT_VOICE overrides the configured voice outright (including any
+        "+variant" suffix the user puts in it); the state.json variant only
+        layers onto the configured voice.
+        """
+        cfg = self._recite_settings()
+        voice = os.environ.get('POETIT_VOICE')
+        if not voice:
+            voice = cfg.get('voice') or _RECITE_DEFAULTS['voice']
+            if cfg.get('variant'):
+                voice = f"{voice}+{cfg['variant']}"
+        args = [exe, '-v', voice,
+                '-s', str(cfg.get('speed') or _RECITE_DEFAULTS['speed'])]
+        if cfg.get('pitch') is not None:
+            args += ['-p', str(cfg['pitch'])]
+        if cfg.get('amplitude') is not None:
+            args += ['-a', str(cfg['amplitude'])]
+        args.append('--stdin')
+        return args
+
     def _recite_start(self):
         import subprocess
         text = "\n".join(te.get() for te, _ in self.lines).strip()
@@ -831,12 +901,8 @@ class Editor:
                     "Install it with:  sudo apt install espeak-ng",
                 )
             return
-        # -s 140: recitation pace, slower than espeak's talky default.
-        # Received Pronunciation reads verse better than the default voice;
-        # POETIT_VOICE overrides it (see `espeak-ng --voices=en`).
-        voice = os.environ.get('POETIT_VOICE', 'en-gb-x-rp')
         self._recite_proc = subprocess.Popen(
-            [exe, '-v', voice, '-s', '140', '--stdin'],
+            self._recite_command(exe),
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
