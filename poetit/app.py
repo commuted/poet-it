@@ -157,8 +157,9 @@ Thesaurus  Synonyms for the word at the cursor; click one to replace the word.
 Spell      Toggles inline spell-checking. Misspelled words get a red underline;
            hover one to see suggestions and click to apply.
 
-Recite     On the menu bar, right of Help: reads the poem aloud (offline, via
-           espeak-ng). While speaking it reads Stop; click to interrupt.
+Recite     Button at the right end of the menu line. Reads the poem aloud
+           (offline, via espeak-ng); stays pressed while speaking, click
+           again to stop.
 
 Versions
 --------
@@ -249,10 +250,10 @@ Spell       Toggles inline spell-checking, backed by the `pyspellchecker`
             package. Misspelled words gain a red underline; hover one for
             suggestions and click a suggestion to apply it.
 
-Recite      A menu-bar entry to the right of Help. Reads the whole poem aloud
-            with the espeak-ng synthesizer — entirely offline, no accounts or
-            cloud services. While speaking the entry reads Stop; click it to
-            interrupt mid-poem.
+Recite      A button at the right end of the menu line. Reads the whole poem
+            aloud with the espeak-ng synthesizer — entirely offline, no
+            accounts or cloud services. The button stays pressed while
+            speaking; click it again to stop mid-poem.
 
             The voice is configurable in ~/.poetit/state.json, under
             "recite" (written with its defaults on first use):
@@ -839,20 +840,11 @@ class Editor:
                 return candidate
         return None
 
-    def _menu_recite_click(self):
-        if self._recite_proc is not None:
-            self._recite_stop()
-        else:
-            self._recite_var.set(True)
+    def _toggle_recite(self):
+        if self._recite_var.get():
             self._recite_start()
-        self._sync_recite_menu()
-
-    def _sync_recite_menu(self):
-        label = "Stop" if self._recite_proc is not None else "Recite"
-        try:
-            self._menubar.entryconfigure(self._recite_menu_index, label=label)
-        except (tk.TclError, AttributeError):
-            pass
+        else:
+            self._recite_stop()
 
     def _recite_settings(self):
         """The "recite" block of state.json over _RECITE_DEFAULTS.
@@ -941,14 +933,12 @@ class Editor:
         else:
             self._recite_proc = None
             self._recite_var.set(False)
-            self._sync_recite_menu()
 
     def _recite_stop(self):
         proc, self._recite_proc = self._recite_proc, None
         if proc is not None and proc.poll() is None:
             proc.terminate()
         self._recite_var.set(False)
-        self._sync_recite_menu()
 
     def _about_click(self):
         popup = tk.Toplevel(self.root)
@@ -1879,12 +1869,13 @@ class Editor:
 
     def _build_ui(self):
         self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(0, weight=0)   # toolbar
-        self.root.rowconfigure(1, weight=1)   # editor
+        self.root.rowconfigure(0, weight=0)   # menu line
+        self.root.rowconfigure(1, weight=0)   # toolbar
+        self.root.rowconfigure(2, weight=1)   # editor
 
         # --- Toolbar ---
         tb = tk.Frame(self.root, bd=1, relief="raised")
-        tb.grid(row=0, column=0, sticky="ew")
+        tb.grid(row=1, column=0, sticky="ew")
 
         # Meter toggle button (Checkbutton with indicatoron=False acts as a push-toggle)
         self._meter_btn = tk.Checkbutton(
@@ -1951,7 +1942,7 @@ class Editor:
 
         # --- Editor area ---
         outer = tk.Frame(self.root)
-        outer.grid(row=1, column=0, sticky="nsew")
+        outer.grid(row=2, column=0, sticky="nsew")
         outer.columnconfigure(0, weight=1)
         outer.rowconfigure(0, weight=1)
 
@@ -1986,7 +1977,16 @@ class Editor:
         self._build_menu()
 
     def _build_menu(self):
-        menu = tk.Menu(self.root)
+        # A frame of Menubuttons instead of a native tk.Menu menubar: the
+        # native bar cannot right-align entries or host real widgets, and the
+        # Recite button belongs on this line, at its right edge.
+        menu = tk.Frame(self.root, bd=1, relief="raised")
+        menu.grid(row=0, column=0, sticky="ew")
+
+        def _pulldown(label, submenu):
+            mb = tk.Menubutton(menu, text=label, menu=submenu, padx=10, pady=3)
+            mb.pack(side="left")
+            return mb
 
         fm = tk.Menu(menu, tearoff=0)
         fm.add_command(label="New",      command=self._new)
@@ -2001,19 +2001,19 @@ class Editor:
         fm.add_command(label="Export…",  command=self._export)
         fm.add_separator()
         fm.add_command(label="Exit",     command=self._quit)
-        menu.add_cascade(label="File", menu=fm)
+        _pulldown("File", fm)
 
         font_menu = tk.Menu(menu, tearoff=0)
         for fname in self._avail_fonts:
             font_menu.add_radiobutton(label=fname, variable=self._font_var,
                                       value=fname, command=self._apply_font)
-        menu.add_cascade(label="Font", menu=font_menu)
+        _pulldown("Font", font_menu)
 
         size_menu = tk.Menu(menu, tearoff=0)
         for sz in SIZES:
             size_menu.add_radiobutton(label=str(sz), variable=self._size_var,
                                       value=sz, command=self._apply_font)
-        menu.add_cascade(label="Size", menu=size_menu)
+        _pulldown("Size", size_menu)
 
         self._theme_light_menu = tk.Menu(menu, tearoff=0)
         self._theme_dark_menu  = tk.Menu(menu, tearoff=0)
@@ -2022,7 +2022,7 @@ class Editor:
         theme_menu.add_cascade(label="Dark",  menu=self._theme_dark_menu)
         theme_menu.add_separator()
         theme_menu.add_command(label="Edit Themes…", command=self._edit_themes_dialog)
-        menu.add_cascade(label="Theme", menu=theme_menu)
+        _pulldown("Theme", theme_menu)
         self._rebuild_theme_menus()
 
         help_menu = tk.Menu(menu, tearoff=0)
@@ -2030,23 +2030,21 @@ class Editor:
         help_menu.add_command(label="Concise Help", command=self._help_concise)
         help_menu.add_command(label="Online Help",  command=self._help_pdf)
         help_menu.add_command(label="Support",      command=self._help_support)
-        menu.add_command(label="    ", state="disabled")
-        menu.add_command(label="    ", state="disabled")
-        menu.add_cascade(label="Help", menu=help_menu)
-        # Recite lives on the menu bar, right of Help: the button toolbar is
-        # crowded, and a menubar command entry works like a push button. Its
-        # label flips to Stop while a recitation is playing.
-        menu.add_command(label="Recite", command=self._menu_recite_click)
-        self._recite_menu_index = menu.index("end")
-        # Right-aligned, non-interactive indicator showing the active repository
-        # location. Darkened from the default disabled grey so it stays legible.
-        menu.add_command(state="disabled")
-        menu.configure(disabledforeground="#222222")
-        self._menubar = menu
-        self._repo_label_index = menu.index("end")
-        self._refresh_repo_label()
+        _pulldown("Help", help_menu)
 
-        self.root.config(menu=menu)
+        # Far right of the pull-down line: a real raised button, out of the
+        # crowded toolbar. Pressed while a recitation plays; auto-releases.
+        self._recite_btn = tk.Checkbutton(
+            menu, text="Recite",
+            variable=self._recite_var,
+            command=self._toggle_recite,
+            indicatoron=False, relief="raised", padx=8, pady=2,
+        )
+        self._recite_btn.pack(side="right", padx=6, pady=2)
+        # Non-interactive indicator showing the active repository location.
+        self._repo_label = tk.Label(menu, fg="#222222")
+        self._repo_label.pack(side="right", padx=(0, 12))
+        self._refresh_repo_label()
 
     @property
     def _repo_path(self):
@@ -2063,13 +2061,12 @@ class Editor:
             os.path.expanduser("~"), "Documents", "Poetit")
 
     def _refresh_repo_label(self):
-        """Keep the menubar repository indicator in sync with the active repo."""
-        menubar = getattr(self, "_menubar", None)
-        if menubar is None:
+        """Keep the menu-line repository indicator in sync with the active repo."""
+        label = getattr(self, "_repo_label", None)
+        if label is None:
             return
         try:
-            menubar.entryconfigure(self._repo_label_index,
-                                   label=self._repo_display_path())
+            label.config(text=self._repo_display_path())
         except tk.TclError:
             pass
 
