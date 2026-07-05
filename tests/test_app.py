@@ -238,11 +238,11 @@ def test_recite_settings_user_edits_win(ed, recite_state):
     os.makedirs(recite_state.parent, exist_ok=True)
     with open(recite_state, "w", encoding="utf-8") as f:
         json.dump({"recite": {"voice": "en-gb-scotland", "variant": "f3",
-                              "speed": 120, "pitch": 60}}, f)
+                              "speed": 120, "pitch": 60, "amplitude": 150,
+                              "word_gap": 1, "capitals": 20}}, f)
     cmd = ed._recite_command("espeak-ng")
-    assert cmd[:6] == ["espeak-ng", "-v", "en-gb-scotland+f3", "-s", "120", "-p"]
-    assert cmd[6] == "60"
-    assert cmd[-1] == "--stdin"
+    assert cmd == ["espeak-ng", "-v", "en-gb-scotland+f3", "-s", "120",
+                   "-p", "60", "-a", "150", "-g", "1", "-k", "20", "--stdin"]
 
 
 def test_recite_env_overrides_config(ed, recite_state, monkeypatch):

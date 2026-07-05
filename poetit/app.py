@@ -38,6 +38,8 @@ _RECITE_DEFAULTS = {
     "speed":     140,           # words per minute
     "pitch":     None,          # 0-99 (espeak default 50)
     "amplitude": None,          # 0-200 (espeak default 100)
+    "word_gap":  None,          # pause between words, 10 ms units (-g)
+    "capitals":  None,          # pitch raise for capitals, Hz (-k)
 }
 
 
@@ -258,8 +260,11 @@ Recite      Reads the whole poem aloud with the espeak-ng synthesizer —
               speed      words per minute (default 140)
               pitch      0-99 (null = espeak's default, 50)
               amplitude  0-200 (null = espeak's default, 100)
+              word_gap   pause between words, in 10 ms units (espeak -g)
+              capitals   pitch raise for capital letters, Hz (espeak -k)
             The POETIT_VOICE environment variable, if set, overrides the
-            configured voice+variant.
+            configured voice+variant. Note the snap edition reads its own
+            copy: ~/snap/poetit/current/.poetit/state.json.
 
 Diagram     Draws a dependency-parse diagram of the sentence at the cursor —
             see section 4. By default this uses a bundled UDPipe English model
@@ -881,10 +886,10 @@ class Editor:
                 voice = f"{voice}+{cfg['variant']}"
         args = [exe, '-v', voice,
                 '-s', str(cfg.get('speed') or _RECITE_DEFAULTS['speed'])]
-        if cfg.get('pitch') is not None:
-            args += ['-p', str(cfg['pitch'])]
-        if cfg.get('amplitude') is not None:
-            args += ['-a', str(cfg['amplitude'])]
+        for key, flag in (('pitch', '-p'), ('amplitude', '-a'),
+                          ('word_gap', '-g'), ('capitals', '-k')):
+            if cfg.get(key) is not None:
+                args += [flag, str(cfg[key])]
         args.append('--stdin')
         return args
 
