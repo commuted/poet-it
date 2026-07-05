@@ -237,7 +237,9 @@ Spell       Toggles inline spell-checking, backed by the `pyspellchecker`
 
 Recite      Reads the whole poem aloud with the espeak-ng synthesizer —
             entirely offline, no accounts or cloud services. The button stays
-            pressed while speaking; click it again to stop mid-poem.
+            pressed while speaking; click it again to stop mid-poem. The
+            default voice is British Received Pronunciation; set POETIT_VOICE
+            to any id from `espeak-ng --voices=en` to change it.
 
 Diagram     Draws a dependency-parse diagram of the sentence at the cursor —
             see section 4. By default this uses a bundled UDPipe English model
@@ -830,8 +832,11 @@ class Editor:
                 )
             return
         # -s 140: recitation pace, slower than espeak's talky default.
+        # Received Pronunciation reads verse better than the default voice;
+        # POETIT_VOICE overrides it (see `espeak-ng --voices=en`).
+        voice = os.environ.get('POETIT_VOICE', 'en-gb-x-rp')
         self._recite_proc = subprocess.Popen(
-            [exe, '-s', '140', '--stdin'],
+            [exe, '-v', voice, '-s', '140', '--stdin'],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
