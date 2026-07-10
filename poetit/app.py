@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import tempfile
@@ -468,6 +469,7 @@ class Editor:
         self._current_path = None
         self._repo_path    = None  # active git repository
         self._is_dirty     = False
+        self._saved_state  = None  # (content, meta) as last saved/loaded
         self._sel_anchor   = None
         self._sel_focus    = None
         self._click_row    = None
@@ -515,7 +517,7 @@ class Editor:
         self._apply_theme(self._theme_data.get("active", "Classic Light"), save=False)
         init_w = (80 + MARGIN_CHARS) * self._char_w + 20
         self.root.geometry(f"{init_w}x600")
-        self._update_title()
+        self._mark_clean()
         self.root.protocol("WM_DELETE_WINDOW", self._quit)
 
         if _VCS_AVAILABLE:
@@ -2778,7 +2780,33 @@ class Editor:
 
     def _mark_clean(self):
         self._is_dirty = False
+        self._saved_state = copy.deepcopy(self._pending_save())
         self._update_title()
+
+    def _pending_save(self):
+        """Content and metadata exactly as _write_files would persist them.
+
+        Trailing spaces on each line and trailing empty lines are
+        stripped, so incidental whitespace from clicks and cursor
+        movement does not count as a change.
+        """
+        content = [te.get().rstrip(' ') for te, _ in self.lines]
+        while content and not content[-1]:
+            content.pop()
+        meta = self._build_meta()
+        meta["lines"] = meta["lines"][:len(content)]
+        # Trim run lengths to the stripped text so trailing spaces do
+        # not survive in the metadata either.
+        for i, line in enumerate(content):
+            runs, remaining = [], len(line)
+            for r in meta["lines"][i]:
+                if remaining <= 0:
+                    break
+                take = min(r["len"], remaining)
+                runs.append({**r, "len": take})
+                remaining -= take
+            meta["lines"][i] = runs
+        return content, meta
 
     def _confirm_discard(self):
         """Return True if it is safe to replace the current document.
@@ -2789,6 +2817,11 @@ class Editor:
           Cancel → return False (caller should abort)
         """
         if not self._is_dirty:
+            return True
+        if self._saved_state is not None and self._pending_save() == self._saved_state:
+            # Only incidental whitespace changed; a save would write
+            # files identical to the last save/load, so nothing is lost.
+            self._mark_clean()
             return True
         name   = os.path.basename(self._current_path) if self._current_path else "Untitled"
         answer = messagebox.askyesnocancel(
@@ -2825,11 +2858,10 @@ class Editor:
         self._trim_rows(0)
         self._populate(INITIAL_LINES)
         self._current_path = None
-        self._is_dirty     = False
         self._last_focus_row = None
         self._last_focus_cursor = 0
         self._update_rhyme_scheme()
-        self._update_title()
+        self._mark_clean()
         if self.lines:
             self.lines[0][0].focus_set()
 
@@ -3144,13 +3176,9 @@ class Editor:
         self._mark_clean()
 
     def _write_files(self, path):
-        content = [te.get().rstrip(' ') for te, _ in self.lines]
-        while content and not content[-1]:
-            content.pop()
+        content, meta = self._pending_save()
         try:
             file_io.write_text_file(path, content)
-            meta = self._build_meta()
-            meta["lines"] = meta["lines"][:len(content)]
             file_io.write_meta_file(path, meta)
             self._current_path = path
             self._mark_clean()
