@@ -1,6 +1,6 @@
 [Desktop Entry]
 Version=1.0
-Name=Poetit
+Name=Poet-it
 GenericName=Poetry Editor
 Comment=Desktop poetry editor with meter, rhyme, spell check, and version control
 Exec=poet-it %U

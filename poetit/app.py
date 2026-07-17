@@ -2771,7 +2771,7 @@ class Editor:
     def _update_title(self):
         name  = os.path.basename(self._current_path) if self._current_path else "Untitled"
         dirty = " \u2022" if self._is_dirty else ""   # bullet = unsaved indicator
-        self.root.title(f"{name}{dirty} — Poetit")
+        self.root.title(f"{name}{dirty} — Poet-it")
 
     def _mark_dirty(self):
         if not self._is_dirty:

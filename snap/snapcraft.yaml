@@ -1,6 +1,6 @@
 name: poet-it
 version: "0.1.0"   # keep in sync with pyproject.toml [project].version
-title: Poetit
+title: Poet-it
 license: MIT
 contact: https://github.com/commuted/poet-it/issues
 issues: https://github.com/commuted/poet-it/issues
