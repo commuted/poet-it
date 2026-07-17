@@ -1,11 +1,11 @@
-name: poetit
+name: poet-it
 version: "0.1.0"   # keep in sync with pyproject.toml [project].version
 title: Poetit
 license: MIT
-contact: https://github.com/commuted/poetit/issues
-issues: https://github.com/commuted/poetit/issues
-website: https://github.com/commuted/poetit
-source-code: https://github.com/commuted/poetit
+contact: https://github.com/commuted/poet-it/issues
+issues: https://github.com/commuted/poet-it/issues
+website: https://github.com/commuted/poet-it
+source-code: https://github.com/commuted/poet-it
 summary: Desktop poetry editor with meter, rhyme, thesaurus, and version control
 description: |
   Poetit is a line-by-line poetry editor built with Python and tkinter.
@@ -68,7 +68,7 @@ parts:
       - espeak-ng-data
 
 apps:
-  poetit:
+  poet-it:
     command: bin/poetit-launch
     extensions: [gnome]
     plugs:
