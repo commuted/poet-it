@@ -29,37 +29,46 @@ def show_word_list_popup(root, title, header, words, on_select, width=220, heigh
         tk.Button(popup, text='Close', command=popup.destroy).pack(pady=6)
         return
 
+    tk.Label(popup, text=f'{len(words)} found — double-click or press Enter to insert.',
+             anchor='w', fg='gray').pack(fill=tk.X, padx=6)
+
     outer = tk.Frame(popup)
     outer.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
-    cv = tk.Canvas(outer, width=width, height=height, bg='white')
-    sb = tk.Scrollbar(outer, orient='vertical', command=cv.yview)
-    cv.configure(yscrollcommand=sb.set)
-    cv.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    # A single Listbox renders thousands of rows instantly. The previous design
+    # created one Button (an X window) per word, which hung the UI and pegged
+    # ibus on large lists — e.g. "saints" returns 3654 rhymes, "lost" 1645.
+    sb = tk.Scrollbar(outer, orient='vertical')
+    lb = tk.Listbox(outer, height=max(6, height // 18), width=max(16, width // 8),
+                    activestyle='dotbox', bg='white', exportselection=False,
+                    yscrollcommand=sb.set)
+    sb.configure(command=lb.yview)
+    lb.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
     sb.pack(side=tk.RIGHT, fill=tk.Y)
 
-    inner = tk.Frame(cv, bg='white')
-    cv.create_window((0, 0), window=inner, anchor='nw')
+    lb.insert('end', *words)
+    lb.selection_set(0)
+    lb.activate(0)
+    lb.focus_set()
 
-    for word in words:
-        def _cmd(w=word):
-            on_select(w)
-            popup.destroy()
-        tk.Button(
-            inner, text=word, anchor='w', relief='flat',
-            bg='white', activebackground='#ddeeff', command=_cmd,
-        ).pack(fill=tk.X, padx=2, pady=1)
-
-    inner.update_idletasks()
-    cv.configure(scrollregion=cv.bbox('all'))
+    def _choose(_event=None):
+        sel = lb.curselection()
+        if not sel:
+            return
+        word = lb.get(sel[0])
+        popup.destroy()
+        on_select(word)
 
     def _scroll(event):
-        if event.num == 4:   cv.yview_scroll(-1, 'units')
-        elif event.num == 5: cv.yview_scroll(1, 'units')
-        else:                cv.yview_scroll(int(-1 * (event.delta / 120)), 'units')
+        if event.num == 4:   lb.yview_scroll(-1, 'units')
+        elif event.num == 5: lb.yview_scroll(1, 'units')
+        else:                lb.yview_scroll(int(-1 * (event.delta / 120)), 'units')
+
+    lb.bind('<Double-Button-1>', _choose)
+    lb.bind('<Return>', _choose)
+    popup.bind('<Escape>', lambda e: popup.destroy())
     for seq in ('<MouseWheel>', '<Button-4>', '<Button-5>'):
-        cv.bind(seq, _scroll)
-        inner.bind(seq, _scroll)
+        lb.bind(seq, _scroll)
 
 
 def show_definition_popup(root, word):

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.commuted.poetit</id>
-  <name>Poetit</name>
+  <id>io.github.commuted.poet_it</id>
+  <name>Poet-it</name>
   <summary>Poetry editor with meter, rhyme, thesaurus, and version control</summary>
   <metadata_license>MIT</metadata_license>
   <project_license>MIT</project_license>
@@ -11,11 +11,11 @@
   </developer>
   <update_contact>commuted_AT_gmail.com</update_contact>
 
-  <launchable type="desktop-id">io.github.commuted.poetit.desktop</launchable>
+  <launchable type="desktop-id">io.github.commuted.poet_it.desktop</launchable>
 
   <description>
     <p>
-      Poetit is a line-by-line poetry editor built with Python and tkinter.
+      Poet-it is a line-by-line poetry editor built with Python and tkinter.
       It counts syllables, marks stress patterns, detects rhyme schemes,
       provides thesaurus lookup, and tracks poem history with Git.
     </p>
@@ -32,40 +32,40 @@
 
   <screenshots>
     <screenshot type="default">
-      <image type="source" width="1835" height="905">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/dependency.png</image>
+      <image type="source" width="1835" height="905">https://raw.githubusercontent.com/commuted/poet-it/main/screenshots/dependency.png</image>
       <caption>Dependency parse diagram powered by Stanza</caption>
     </screenshot>
     <screenshot>
-      <image type="source" width="891" height="744">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/spell.png</image>
+      <image type="source" width="891" height="744">https://raw.githubusercontent.com/commuted/poet-it/main/screenshots/spell.png</image>
       <caption>Inline spell checking with suggestions</caption>
     </screenshot>
     <screenshot>
-      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/prosodic.png</image>
+      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poet-it/main/screenshots/prosodic.png</image>
       <caption>Stress-marked meter analysis</caption>
     </screenshot>
     <screenshot>
-      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/rhyme.png</image>
+      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poet-it/main/screenshots/rhyme.png</image>
       <caption>Rhyme scheme detection and word-level rhyme lookup</caption>
     </screenshot>
     <screenshot>
-      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/thesaurus.png</image>
+      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poet-it/main/screenshots/thesaurus.png</image>
       <caption>Integrated thesaurus and WordNet definitions</caption>
     </screenshot>
     <screenshot>
-      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/definition.png</image>
+      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poet-it/main/screenshots/definition.png</image>
       <caption>Word definitions from bundled WordNet</caption>
     </screenshot>
     <screenshot>
-      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poetit/main/screenshots/version.png</image>
+      <image type="source" width="871" height="699">https://raw.githubusercontent.com/commuted/poet-it/main/screenshots/version.png</image>
       <caption>Git-based version control and commit history browser</caption>
     </screenshot>
   </screenshots>
 
-  <url type="homepage">https://github.com/commuted/poetit</url>
-  <url type="bugtracker">https://github.com/commuted/poetit/issues</url>
+  <url type="homepage">https://github.com/commuted/poet-it</url>
+  <url type="bugtracker">https://github.com/commuted/poet-it/issues</url>
 
   <provides>
-    <binary>poetit</binary>
+    <binary>poet-it</binary>
   </provides>
 
   <releases>

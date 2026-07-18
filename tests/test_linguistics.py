@@ -1,5 +1,5 @@
 import pytest
-from poetit.linguistics import Linguistics, word_at_cursor
+from poet_it.linguistics import Linguistics, word_at_cursor
 
 
 # One shared instance — loading CMUDict and the rhyme dict is slow.

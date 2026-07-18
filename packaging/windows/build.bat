@@ -1,5 +1,5 @@
 @echo off
-:: Poetit Windows standalone build
+:: Poet-it Windows standalone build
 :: Run this from the project root:  packaging\windows\build.bat
 ::
 :: Prerequisites (run once):
@@ -13,8 +13,8 @@ if errorlevel 1 (
     pip install pyinstaller
 )
 
-echo Building Poetit...
-pyinstaller packaging\windows\poetit.spec --clean --noconfirm
+echo Building Poet-it...
+pyinstaller packaging\windows\poet-it.spec --clean --noconfirm
 
 echo.
-echo Done. Run:  dist\Poetit\Poetit.exe
+echo Done. Run:  dist\Poet-it\Poet-it.exe

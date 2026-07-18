@@ -1,15 +1,15 @@
-"""Smoke tests for the Stanza/PyTorch surface poetit depends on.
+"""Smoke tests for the Stanza/PyTorch surface poet_it depends on.
 
 These tests guard the dependency scope documented at
-``Linguistics._STANZA_PROCESSORS`` in poetit/linguistics.py, so that
+``Linguistics._STANZA_PROCESSORS`` in poet_it/linguistics.py, so that
 ``scripts/trim_nlp_footprint.py`` (which strips unused parts of stanza and
-torch from an install) can be verified against the exact code paths poetit
+torch from an install) can be verified against the exact code paths poet_it
 exercises.
 """
 
 import pytest
 
-from poetit.linguistics import Linguistics, STANZA_AVAILABLE
+from poet_it.linguistics import Linguistics, STANZA_AVAILABLE
 
 # Two sentences; the contraction exercises the MWT processor.
 SAMPLE_TEXT = "They don't know the poet's words. It rains softly tonight."
@@ -80,7 +80,7 @@ class TestPipelineSurface:
         assert "do" in words and "n't" in words
 
     def test_consumed_word_attributes(self, stanza_doc):
-        """Every attribute poetit reads must be populated on every word."""
+        """Every attribute poet_it reads must be populated on every word."""
         for sent in stanza_doc.sentences:
             for w in sent.words:
                 assert isinstance(w.text, str) and w.text
@@ -108,7 +108,7 @@ class TestPipelineSurface:
         Covers the original bug (first sentence ending in '?' shadowed the
         second) and a sentence spanning a line break.
         """
-        from poetit.app import _sentence_index_at_offset
+        from poet_it.app import _sentence_index_at_offset
 
         text = "Does the cat sleep? The dog barks."
         doc = stanza_pipeline(text)
@@ -124,7 +124,7 @@ class TestPipelineSurface:
         assert _sentence_index_at_offset(doc, poem.index("sings")) == 1
 
     def test_linguistics_adapter(self, stanza_doc):
-        """End-to-end through poetit's own diagram accessor (Stanza quality mode
+        """End-to-end through poet_it's own diagram accessor (Stanza quality mode
         when its model is present, else the bundled UDPipe fallback)."""
         nlp = Linguistics()
         doc = nlp.get_diagram_doc(SAMPLE_TEXT)

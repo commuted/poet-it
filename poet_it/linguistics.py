@@ -108,7 +108,7 @@ def _inject_bundled_nltk_data():
     """Add the package's bundled corpora directory to NLTK's search path."""
     from importlib.resources import files
     try:
-        data_dir = str(files('poetit').joinpath('data'))
+        data_dir = str(files('poet_it').joinpath('data'))
     except Exception:
         data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
     if data_dir not in nltk.data.path:
@@ -130,7 +130,7 @@ def _ensure_nltk_data():
 def _read_data(filename):
     from importlib.resources import files
     try:
-        return files('poetit').joinpath('data', filename).read_text(encoding='utf-8')
+        return files('poet_it').joinpath('data', filename).read_text(encoding='utf-8')
     except Exception:
         pass
     here = os.path.dirname(os.path.abspath(__file__))
@@ -494,7 +494,7 @@ class Linguistics:
     # Stanza
     # ------------------------------------------------------------------ #
 
-    # The complete Stanza surface poetit consumes: this processor list, plus
+    # The complete Stanza surface poet-it consumes: this processor list, plus
     # doc.sentences[*].words[*] attributes text/id/head/xpos/upos/deprel/lemma
     # and doc.sentences[*] attributes text and tokens[*].start_char (read
     # here, in app.py, and in popups.py). scripts/trim_nlp_footprint.py and
@@ -503,7 +503,7 @@ class Linguistics:
 
     # Pin the EWT-only model (CC BY-SA 4.0). Stanza's default English package is
     # a combined model that includes GUM (CC BY-NC-SA 4.0), whose non-commercial
-    # term is incompatible with poetit's MIT licensing.
+    # term is incompatible with poet_it's MIT licensing.
     _STANZA_PACKAGE = 'ewt'
 
     @staticmethod
@@ -573,7 +573,7 @@ class Linguistics:
     def _udpipe_model_path(self):
         from importlib.resources import files
         try:
-            return str(files('poetit').joinpath('data', self._UDPIPE_MODEL_FILE))
+            return str(files('poet_it').joinpath('data', self._UDPIPE_MODEL_FILE))
         except Exception:
             here = os.path.dirname(os.path.abspath(__file__))
             return os.path.join(here, 'data', self._UDPIPE_MODEL_FILE)

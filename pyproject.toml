@@ -3,7 +3,7 @@ requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "poetit"
+name = "poet-it"
 version = "0.1.0"
 description = "Desktop poetry editor with meter analysis, rhyme lookup, thesaurus, and version control"
 readme = "README.md"
@@ -47,30 +47,30 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage      = "https://github.com/commuted/poetit"
-Repository    = "https://github.com/commuted/poetit"
-"Bug Tracker" = "https://github.com/commuted/poetit/issues"
+Homepage      = "https://github.com/commuted/poet-it"
+Repository    = "https://github.com/commuted/poet-it"
+"Bug Tracker" = "https://github.com/commuted/poet-it/issues"
 
 [project.optional-dependencies]
 # "Quality mode": a more accurate dependency diagram via Stanza's biaffine
 # parser. Opt-in because Stanza pulls PyTorch (~1.7 GB) and downloads its EWT
-# model (~500 MB) on first use. Without it, poetit uses the bundled UDPipe model.
+# model (~500 MB) on first use. Without it, poet-it uses the bundled UDPipe model.
 quality = ["stanza>=1.7"]
 dev = ["build", "twine", "pytest>=8.0"]
 
 [project.scripts]
-poetit = "poetit.app:main"
-poetit-install-desktop = "poetit.app:setup_linux_desktop"
+poet-it = "poet_it.app:main"
+poet-it-install-desktop = "poet_it.app:setup_linux_desktop"
 
 [project.gui-scripts]
-poetit-gui = "poetit.app:main"
+poet-it-gui = "poet_it.app:main"
 
 [tool.setuptools.packages.find]
 where   = ["."]
-include = ["poetit", "poetit.*"]
+include = ["poet_it", "poet_it.*"]
 
 [tool.setuptools.package-data]
-"poetit" = [
+"poet_it" = [
     "data/*.json",
     "data/*.dict",
     "data/*.png",

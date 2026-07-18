@@ -9,5 +9,5 @@ Terminal=false
 Type=Application
 Categories=Office;TextEditor;
 Keywords=poetry;editor;rhyme;meter;thesaurus;linguistics;spell;
-StartupWMClass=Poetit
+StartupWMClass=Poet-it
 StartupNotify=true
