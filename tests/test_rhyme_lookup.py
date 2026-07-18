@@ -131,6 +131,7 @@ class TestPackageDataIntegrity:
         from importlib.resources import files
         d = files("poet_it").joinpath("data")
         for name in ("ICD9N.jpg", "about.txt", "icon.png", "qr-code.png",
+                     "help.txt", "guide.txt",
                      "rdict.json", "cmudict.dict", "poet-it.desktop"):
             assert d.joinpath(name).is_file(), f"missing package data: {name}"
 
@@ -142,3 +143,29 @@ class TestPackageDataIntegrity:
             src = py.read_text()
             assert "files('poet-it')" not in src, f"stale resource name in {py.name}"
             assert 'files("poet-it")' not in src, f"stale resource name in {py.name}"
+
+
+class TestHelpText:
+    """Both help texts load from package data; the repository / Import /
+    Export distinction is the first obstacle a new user meets, so the guide
+    must lead with it."""
+
+    def _load(self, name):
+        from importlib.resources import files
+        return files("poet_it").joinpath("data", name).read_text(encoding="utf-8")
+
+    def test_guide_leads_with_the_repository(self):
+        guide = self._load("guide.txt")
+        first_section = guide.index("1. WHERE POEMS LIVE")
+        assert first_section < guide.index("2. THE EDITING SURFACE")
+        for term in ("Import", "Export", "repository", "COPIED"):
+            assert term in guide
+
+    def test_concise_help_covers_import_export(self):
+        help_text = self._load("help.txt")
+        for term in ("Where poems live", "Import", "Export", "repository"):
+            assert term in help_text
+
+    def test_issues_url_token_present(self):
+        assert "{ISSUES_URL}" in self._load("help.txt")
+        assert "{ISSUES_URL}" in self._load("guide.txt")

@@ -1,0 +1,71 @@
+POET-IT — HELP
+
+Overview
+--------
+Poet-it is a poetry editor with a live syllable count in the right margin and
+a rhyme-scheme letter beside each line. Poems are kept in a Git repository at
+~/Documents/Poet-it, so every saved version is recoverable.
+
+Where poems live
+----------------
+All poems live in one version-controlled folder — the repository, at
+~/Documents/Poet-it. That folder is what makes Make Version and the Version
+Tree possible, and its protection only covers poems stored there. Open
+therefore shows the repository's poems rather than a file dialog. To work on
+a file from anywhere else, use Import: it copies the file into the repository
+and leaves your original untouched. Export writes a copy of the current poem
+back out to a location you choose. The Detailed Guide covers this first, in
+full.
+
+The toolbar
+-----------
+Meter      Replaces each line in place with a stress-marked version of itself;
+           click again to restore the text. Capitals mark stressed syllables; a
+           centre dot separates syllables. Analysis runs in the background
+           (prosodic where available, NLTK as a fallback).
+
+Rhyme      Looks up rhymes for the word at the cursor and lets you insert one
+           into the line. You can also type any word that already carries the
+           rhyme you intend, place the cursor on it, and pick the real word
+           from the list that pops up.
+
+Definition WordNet definitions for the word at the cursor, grouped by part of
+           speech, with synonyms and example sentences.
+
+Diagram    Draws a dependency-parse diagram of the sentence at the cursor,
+           using a bundled UDPipe model (no download). Install the optional
+           "quality mode" (Stanza) for more accurate parses — see the
+           Detailed Guide.
+
+Thesaurus  Synonyms for the word at the cursor; click one to replace the word.
+
+Spell      Toggles inline spell-checking. Misspelled words get a red underline;
+           hover one to see suggestions and click to apply.
+
+Recite     Button at the right end of the menu line. Reads the poem aloud
+           (offline, via espeak-ng); stays pressed while speaking, click
+           again to stop.
+
+Versions
+--------
+Make Version  Commits the current poem to the repository with a message
+              (pre-filled with a timestamp). Save first if the poem is new.
+
+Version Tree  Shows every committed version of the current poem. Click one to
+              load it; you are prompted to commit or discard any unsaved edits.
+
+Files
+-----
+New / Save / Save As behave as usual, steered into the repository. Open and
+Browse Repository list the poems already in ~/Documents/Poet-it. Import copies
+an outside .txt file into the repository; Export writes the current poem back
+out to a chosen location (see "Where poems live", above).
+
+Appearance
+----------
+The Font, Size and Theme menus change the editor's look. Themes can be edited
+or created from Theme > Edit Themes…, and your choice is remembered.
+
+Support
+-------
+Questions and bug reports: {ISSUES_URL}

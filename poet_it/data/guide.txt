@@ -1,0 +1,205 @@
+POET-IT — DETAILED GUIDE
+
+Poet-it is a poetry editor that keeps every poem in a Git repository under
+~/Documents/Poet-it, so each saved version stays recoverable. The right margin
+shows a live syllable count for every line, with a rhyme-scheme letter beside
+it.
+
+CONTENTS
+  1. Where poems live — the repository
+  2. The editing surface
+  3. Syllable counts and rhyme scheme
+  4. Toolbar tools
+  5. The dependency diagram and its tag legends
+  6. Versions and files
+  7. Appearance
+  8. Support and standards
+
+1. WHERE POEMS LIVE — THE REPOSITORY
+------------------------------------
+This is the first thing about Poet-it that works differently from an ordinary
+editor, so it comes first.
+
+Poet-it does not edit files scattered around your disk. Every poem it manages
+lives in one folder — the repository — at ~/Documents/Poet-it, created (with
+a demo poem) the first time it is needed. The repository is version-
+controlled: each time you choose Make Version, the poem's current state is
+committed to its history, and the Version Tree can return you to any
+committed state. That protection exists only inside the repository, which is
+why the editor steers all file operations there:
+
+  Open      With a repository present, Open lists the repository's poems
+            rather than showing a file dialog — poems live there, so that
+            is where opening starts.
+
+  Import    Brings an outside .txt file in. The file is COPIED into the
+            repository — your original stays where it was, untouched — then
+            opened and committed at once, so its arrival is the first entry
+            in its history. If a poem with that name already exists, the
+            import gets a numbered name instead of overwriting anything.
+
+  Export    Hands a copy back out. The poem is saved, then written to the
+            location you choose, together with its .meta styling sidecar.
+            An export is a snapshot, not a link: edits you make afterwards
+            stay in the repository until you export again.
+
+If you keep poems elsewhere, the working pattern is: Import once, edit and
+version inside the repository, and Export whenever you need a copy outside
+it.
+
+2. THE EDITING SURFACE
+----------------------
+Type as you would in any editor. A few keys act on whole lines:
+  Enter               Split the line at the cursor (new line below)
+  Up / Down           Move between lines
+  Shift+Up / Down     Select whole lines (then Cut / Copy)
+  Backspace at col 0  Merge the line into the one above
+  Right at line end   Adds a trailing space, for free-form layout
+
+3. SYLLABLE COUNTS AND RHYME SCHEME
+-----------------------------------
+Syllable count (grey margin, right of each line) is read from the bundled CMU
+Pronouncing Dictionary (cmudict); words it does not list fall back to NLTK's
+SyllableTokenizer.
+
+Rhyme-scheme letter (far-right column): two lines share a letter (A, B, C …)
+when their final words share the phoneme suffix from the last stressed vowel
+onward, computed from cmudict. Blank lines get no letter.
+
+4. TOOLBAR TOOLS
+----------------
+Meter       Replaces each line in place with a stress-marked version of
+            itself; click Meter again to restore the original text. Capital
+            letters mark stressed syllables and a centre dot separates
+            syllables. Scansion uses the `prosodic` package when it is installed
+            (stressed / unstressed only) and an NLTK-based heuristic otherwise;
+            the NLTK path additionally marks secondary stress with a leading
+            capital. It runs in a background thread so the editor stays
+            responsive while the rows fill in.
+
+Rhyme       With the cursor on a word, lists words that rhyme with it; click an
+            entry to drop it into the line in place of that word. A useful
+            workflow: type any word that already carries the rhyme you intend,
+            put the cursor on it, then choose the word you actually want from
+            the list. With no line in focus, a field appears beside the button
+            — type a word and press Enter to see its rhymes for reference only.
+            Rhymes come from cmudict; a word cmudict does not know is looked
+            up through the closest similarly spelled word instead, and the
+            list says so.
+
+Definition  Definitions for the word at the cursor, grouped by part of speech,
+            each with synonyms and example sentences. Drawn from WordNet (via
+            the NLTK corpus).
+
+Thesaurus   Synonyms for the word at the cursor, from a bundled MyThes-format
+            English thesaurus (th_en_US). Click a synonym to replace the word.
+
+Spell       Toggles inline spell-checking, backed by the `pyspellchecker`
+            package. Misspelled words gain a red underline; hover one for
+            suggestions and click a suggestion to apply it.
+
+Recite      A button at the right end of the menu line. Reads the whole poem
+            aloud with the espeak-ng synthesizer — entirely offline, no
+            accounts or cloud services. The button stays pressed while
+            speaking; click it again to stop mid-poem.
+
+            The voice is configurable in ~/.poet-it/state.json, under
+            "recite" (written with its defaults on first use):
+              voice      espeak-ng voice id — `espeak-ng --voices=en`
+              variant    timbre overlay from espeak-ng-data/voices/!v,
+                         e.g. "f3", "m5", "whisper"
+              speed      words per minute (default 140)
+              pitch      0-99 (null = espeak's default, 50)
+              amplitude  0-200 (null = espeak's default, 100)
+              word_gap   pause between words, in 10 ms units (espeak -g)
+              capitals   pitch raise for capital letters, Hz (espeak -k)
+            The POET_IT_VOICE environment variable, if set, overrides the
+            configured voice+variant. Note the snap edition reads its own
+            copy: ~/snap/poet-it/current/.poet-it/state.json.
+
+Diagram     Draws a dependency-parse diagram of the sentence at the cursor —
+            see section 5. By default this uses a bundled UDPipe English model
+            (no download). For more accurate parses, install the optional
+            "quality mode": Stanza's biaffine parser. It is opt-in because it
+            pulls in PyTorch (~1.7 GB) and downloads its own English model
+            (~500 MB) on first use; install it with
+
+                pip install "poet-it[quality]"
+                python -c "import stanza; stanza.download('en', package='ewt')"
+
+            When present, poet-it uses Stanza automatically and falls back to the
+            bundled UDPipe model otherwise.
+
+5. THE DEPENDENCY DIAGRAM AND ITS TAG LEGENDS
+---------------------------------------------
+Each word sits on the baseline. A curved arrow runs from every head word to
+its dependent and is labelled with the grammatical relation between them; the
+one word that depends on nothing is marked `root`. Below the picture, an
+annotation row repeats each word with its relation and its part of speech.
+
+The annotation follows the Universal Dependencies (UD) scheme — the same labels
+used in CoNLL-U treebank files — as produced by UDPipe or, in quality mode,
+Stanza. Two part-of-speech
+tag sets appear: the abbreviation printed under each word in the diagram is the
+language-specific Penn Treebank tag (XPOS), while the annotation row shows the
+universal tag (UPOS).
+
+Universal POS tags (UPOS) — shown in the annotation row
+    ADJ    adjective                  NUM    numeral
+    ADP    adposition (preposition)   PART   particle
+    ADV    adverb                     PRON   pronoun
+    AUX    auxiliary verb             PROPN  proper noun
+    CCONJ  coordinating conjunction   PUNCT  punctuation
+    DET    determiner                 SCONJ  subordinating conjunction
+    INTJ   interjection               VERB   verb
+    NOUN   noun                       X      other
+
+Penn Treebank tags (XPOS) — printed under each word in the diagram
+    NN   noun, singular               JJ   adjective
+    NNS  noun, plural                 RB   adverb
+    NNP  proper noun, singular        PRP  personal pronoun
+    DT   determiner                   CD   cardinal number
+    IN   preposition / sub. conj.     TO   the word "to"
+    VB   verb, base form              VBD  verb, past tense
+    VBZ  verb, 3rd-person singular    VBG  verb, gerund / present participle
+
+Dependency relations — the arc labels
+    root    head of the whole sentence (depends on nothing)
+    nsubj   nominal subject            cc      coordinating conjunction
+    obj     direct object              conj    conjunct
+    iobj    indirect object            aux     auxiliary
+    det     determiner                 cop     copula
+    case    case marker (preposition   mark    subordinating marker
+            or possessive 's)          amod    adjectival modifier
+    nmod    nominal modifier           advmod  adverbial modifier
+    nummod  numeric modifier           acl     clausal modifier of a noun
+    appos   appositional modifier              (incl. relative clauses)
+            (a renaming phrase)        advcl   adverbial clause
+    obl     oblique nominal            punct   punctuation
+
+The complete tag inventories are defined by the Universal Dependencies project;
+the lists above cover the tags you will meet most often.
+
+6. VERSIONS AND FILES
+---------------------
+Make Version   Commits the current poem with a message (pre-filled with a
+               timestamp). Save a new poem first so it has a file to commit.
+Version Tree   Lists every committed version of the current poem; click one to
+               load it. Unsaved edits prompt a Commit / Discard choice first.
+
+New / Save / Save As behave as usual, steered into the repository. Open and
+Browse Repository list the poems in ~/Documents/Poet-it. Import and Export
+move copies across the repository boundary — section 1 explains the
+distinction and why it matters.
+
+7. APPEARANCE
+-------------
+The Font, Size and Theme menus restyle the editor. Themes can be edited or
+created from Theme > Edit Themes…, and your selection is remembered between
+sessions.
+
+8. SUPPORT AND STANDARDS
+------------------------
+Dependency annotation follows Universal Dependencies
+(universaldependencies.org) in the CoNLL-U format. Questions and bug reports:
+{ISSUES_URL}
