@@ -975,12 +975,17 @@ class Editor:
         scrollbar.pack(side="right", fill="y")
         text_widget.pack(side="left", fill="both", expand=True)
 
-        # QR code image
-        qr_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "qr-code.png")
-        if os.path.exists(qr_path):
+        # QR code image, from package data so installed builds show it too.
+        try:
+            from importlib.resources import files as _files
+            _qr_raw = _files("poet_it").joinpath("data", "qr-code.png").read_bytes()
+        except Exception:
+            _qr_raw = None
+        if _qr_raw:
             try:
+                import io as _io
                 from PIL import Image as _PILImage, ImageTk as _PILImageTk
-                img = _PILImage.open(qr_path).resize((150, 150), _PILImage.LANCZOS)
+                img = _PILImage.open(_io.BytesIO(_qr_raw)).resize((150, 150), _PILImage.LANCZOS)
                 photo = _PILImageTk.PhotoImage(img)
                 qr_label = tk.Label(popup, image=photo)
                 qr_label.image = photo  # keep a reference

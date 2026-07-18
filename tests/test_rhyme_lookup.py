@@ -130,7 +130,7 @@ class TestPackageDataIntegrity:
     def test_data_files_resolve(self):
         from importlib.resources import files
         d = files("poet_it").joinpath("data")
-        for name in ("ICD9N.jpg", "about.txt", "icon.png",
+        for name in ("ICD9N.jpg", "about.txt", "icon.png", "qr-code.png",
                      "rdict.json", "cmudict.dict", "poet-it.desktop"):
             assert d.joinpath(name).is_file(), f"missing package data: {name}"
 
