@@ -12,13 +12,13 @@ import tkinter as tk
 
 import pytest
 
-from poetit.app import (
+from poet_it.app import (
     Editor,
     _DEMO_POEM,
     _DEMO_POEM_NAME,
     _seed_demo_poem,
 )
-from poetit.linguistics import Linguistics
+from poet_it.linguistics import Linguistics
 
 dulwich = pytest.importorskip("dulwich")
 from dulwich.repo import Repo  # noqa: E402

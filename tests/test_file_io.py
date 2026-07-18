@@ -1,5 +1,5 @@
 
-from poetit import file_io
+from poet_it import file_io
 
 
 # ── meta_path ────────────────────────────────────────────────────────────────

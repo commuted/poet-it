@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the poetit unit test suite.
+# Run the poet-it unit test suite.
 # Usage: ./run_tests.sh [pytest options]
 #   ./run_tests.sh -v          verbose output
 #   ./run_tests.sh -k spelling  run only tests matching "spelling"

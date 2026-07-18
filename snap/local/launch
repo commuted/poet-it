@@ -12,4 +12,4 @@ if [ -n "$ESPEAK_LIB" ]; then
     export PATH_ESPEAK="$ESPEAK_LIB"
     export ESPEAK_DATA_PATH="${ESPEAK_LIB%/*}"
 fi
-exec "$SNAP/bin/poetit" "$@"
+exec "$SNAP/bin/poet-it" "$@"

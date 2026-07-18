@@ -1,5 +1,5 @@
 import pytest
-from poetit.linguistics import Linguistics, word_at_cursor
+from poet_it.linguistics import Linguistics, word_at_cursor
 
 
 # One shared instance — loading CMUDict and the rhyme dict is slow.
@@ -66,6 +66,52 @@ class TestLineSyllables:
 
     def test_numbers_ignored(self, nlp):
         assert nlp.line_syllables("42") == 0
+
+
+# ── compose_meter_line ────────────────────────────────────────────────────────
+
+class TestComposeMeterLine:
+    # Well beyond prosodic's MAX_SYLL_IN_PARSE_UNIT (18 sylls).
+    _OVERLONG = (
+        "The extraordinarily complicated situation deteriorated into an "
+        "unbelievably catastrophic misunderstanding today"
+    )
+
+    def test_normal_line_marks_stress(self, nlp):
+        out = nlp.compose_meter_line("Shall I compare thee to a summer's day")
+        assert out
+        assert out.lower() != out          # at least one syllable upper-cased (stressed)
+
+    def test_overlong_line_still_produces_meter(self, nlp):
+        # Regression: lines longer than prosodic's cap used to emit a loud
+        # warning; they must still yield a non-empty stress-marked meter line
+        # (via the NLTK fallback).
+        out = nlp.compose_meter_line(self._OVERLONG)
+        assert out
+        assert out.lower() != out
+
+    def test_overlong_line_skips_prosodic(self, nlp):
+        pytest.importorskip("prosodic")
+        # The over-long line must not be handed to prosodic's parser — it returns
+        # None so compose_meter_line uses the fallback, with no warning/wasted parse.
+        assert nlp._compose_meter_line_prosodic(self._OVERLONG) is None
+
+    def test_short_line_uses_prosodic(self, nlp):
+        pytest.importorskip("prosodic")
+        assert nlp._compose_meter_line_prosodic("Shall I compare thee to a summer's day") is not None
+
+    # Punctuation-only lines: prosodic vocalizes them at parse time (a row of
+    # periods scans as ~27 "syllables") and trips the MAX_SYLL warning. They must
+    # be skipped (wordforms is None) and passed through untouched by the fallback.
+    _PUNCT_ONLY = ". . . . . . . . . . . . . . . . . . . . . . . . ."
+
+    def test_punctuation_only_skips_prosodic(self, nlp):
+        pytest.importorskip("prosodic")
+        assert nlp._compose_meter_line_prosodic(self._PUNCT_ONLY) is None
+
+    def test_punctuation_only_passes_through(self, nlp):
+        # No words to stress-mark → returned unchanged, and no exception.
+        assert nlp.compose_meter_line(self._PUNCT_ONLY) == self._PUNCT_ONLY
 
 
 # ── _cmu_syllables ────────────────────────────────────────────────────────────

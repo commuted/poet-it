@@ -1,13 +1,12 @@
 [Desktop Entry]
 Version=1.0
-Name=Poetit
+Name=Poet-it
 GenericName=Poetry Editor
 Comment=Desktop poetry editor with meter, rhyme, spell check, and version control
-Exec=poetit
-Icon=poetit
+Exec=poet-it %U
+Icon=io.github.commuted.poet_it
 Terminal=false
 Type=Application
 Categories=Office;TextEditor;
 Keywords=poetry;editor;rhyme;meter;thesaurus;linguistics;spell;
-StartupWMClass=Poetit
 StartupNotify=true

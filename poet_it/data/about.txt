@@ -1,4 +1,4 @@
-Poetit
+Poet-it
 Copyright 2026 Ron Hinchley — MIT License, except where otherwise noted
 
 A poetry editor with meter analysis, rhyme detection, and linguistic tools.
@@ -32,10 +32,10 @@ Data:
     https://wordnet.princeton.edu/license-and-commercial-use
 
 Issues:
-  https://github.com/commuted/poetit/issues
+  https://github.com/commuted/poet-it/issues
 
 Source:
-  https://github.com/commuted/poetit
+  https://github.com/commuted/poet-it
 
 Support:
   Scan the QR code to buy me a coffee.

@@ -1,8 +1,8 @@
 # Tell GitHub Linguist these are bundled data files, not project source code.
 # Vendored files are excluded from the repository language statistics.
-poetit/data/rdict.json         linguist-vendored=true
-poetit/data/th_en_US_new.json  linguist-vendored=true
-poetit/data/english-ewt.udpipe linguist-vendored=true binary
+poet_it/data/rdict.json         linguist-vendored=true
+poet_it/data/th_en_US_new.json  linguist-vendored=true
+poet_it/data/english-ewt.udpipe linguist-vendored=true binary
 
 # Corpora data (NLTK zip files etc.)
-poetit/data/corpora/**        linguist-vendored=true
+poet_it/data/corpora/**        linguist-vendored=true

@@ -4,8 +4,8 @@ and auto-scroll features.  These tests require a display server (tkinter).
 import pytest
 import tkinter as tk
 
-from poetit.app import Editor
-from poetit.linguistics import Linguistics
+from poet_it.app import Editor
+from poet_it.linguistics import Linguistics
 
 
 # ---------------------------------------------------------------------------
@@ -176,34 +176,34 @@ class TestSentenceIndexAtOffset:
     def _doc(starts):
         """Stub doc whose sentences start at the given character offsets."""
         from types import SimpleNamespace as NS
-        from poetit.app import _sentence_index_at_offset  # noqa: F401
+        from poet_it.app import _sentence_index_at_offset  # noqa: F401
         return NS(sentences=[NS(tokens=[NS(start_char=s)]) for s in starts])
 
     def test_offset_inside_each_sentence(self):
-        from poetit.app import _sentence_index_at_offset
+        from poet_it.app import _sentence_index_at_offset
         doc = self._doc([0, 20, 41])
         assert _sentence_index_at_offset(doc, 5) == 0
         assert _sentence_index_at_offset(doc, 25) == 1
         assert _sentence_index_at_offset(doc, 60) == 2
 
     def test_offset_in_gap_selects_preceding_sentence(self):
-        from poetit.app import _sentence_index_at_offset
+        from poet_it.app import _sentence_index_at_offset
         doc = self._doc([0, 20])
         assert _sentence_index_at_offset(doc, 19) == 0
 
     def test_offset_at_sentence_start(self):
-        from poetit.app import _sentence_index_at_offset
+        from poet_it.app import _sentence_index_at_offset
         doc = self._doc([0, 20])
         assert _sentence_index_at_offset(doc, 20) == 1
 
     def test_offset_before_first_sentence_falls_back_to_first(self):
-        from poetit.app import _sentence_index_at_offset
+        from poet_it.app import _sentence_index_at_offset
         doc = self._doc([3, 20])
         assert _sentence_index_at_offset(doc, 0) == 0
 
     def test_empty_sentence_tokens_are_skipped(self):
         from types import SimpleNamespace as NS
-        from poetit.app import _sentence_index_at_offset
+        from poet_it.app import _sentence_index_at_offset
         doc = NS(sentences=[NS(tokens=[]), NS(tokens=[NS(start_char=0)])])
         assert _sentence_index_at_offset(doc, 5) == 1
 
@@ -214,12 +214,12 @@ class TestSentenceIndexAtOffset:
 
 @pytest.fixture()
 def recite_state(tmp_path, monkeypatch):
-    """Point the state file at a temp dir so tests never touch ~/.poetit."""
-    import poetit.app as app_mod
-    state_dir = tmp_path / ".poetit"
+    """Point the state file at a temp dir so tests never touch ~/.poet-it."""
+    import poet_it.app as app_mod
+    state_dir = tmp_path / ".poet-it"
     monkeypatch.setattr(app_mod, "_STATE_DIR", str(state_dir))
     monkeypatch.setattr(app_mod, "_STATE_FILE", str(state_dir / "state.json"))
-    monkeypatch.delenv("POETIT_VOICE", raising=False)
+    monkeypatch.delenv("POET_IT_VOICE", raising=False)
     return state_dir / "state.json"
 
 
@@ -250,6 +250,6 @@ def test_recite_env_overrides_config(ed, recite_state, monkeypatch):
     os.makedirs(recite_state.parent, exist_ok=True)
     with open(recite_state, "w", encoding="utf-8") as f:
         json.dump({"recite": {"voice": "en-gb-scotland", "variant": "f3"}}, f)
-    monkeypatch.setenv("POETIT_VOICE", "en-us+m5")
+    monkeypatch.setenv("POET_IT_VOICE", "en-us+m5")
     cmd = ed._recite_command("espeak-ng")
     assert cmd[1:3] == ["-v", "en-us+m5"]   # env wins, config variant not appended

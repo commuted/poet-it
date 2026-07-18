@@ -1,14 +1,14 @@
-name: poetit
+name: poet-it
 version: "0.1.0"   # keep in sync with pyproject.toml [project].version
-title: Poetit
+title: Poet-it
 license: MIT
-contact: https://github.com/commuted/poetit/issues
-issues: https://github.com/commuted/poetit/issues
-website: https://github.com/commuted/poetit
-source-code: https://github.com/commuted/poetit
+contact: https://github.com/commuted/poet-it/issues
+issues: https://github.com/commuted/poet-it/issues
+website: https://github.com/commuted/poet-it
+source-code: https://github.com/commuted/poet-it
 summary: Desktop poetry editor with meter, rhyme, thesaurus, and version control
 description: |
-  Poetit is a line-by-line poetry editor built with Python and tkinter.
+  Poet-it is a line-by-line poetry editor built with Python and tkinter.
 
   Features:
     - Syllable counts via bundled CMU Pronouncing Dictionary
@@ -20,7 +20,7 @@ description: |
     - Dependency-parse diagrams via Stanza (Stanford NLP)
     - Git-based version control with commit history browser
 
-  Poems are stored in ~/Documents/Poetit/.
+  Poems are stored in ~/Documents/Poet-it/.
   No Electron, no browser — pure Python desktop app.
 
 grade: stable
@@ -32,15 +32,15 @@ parts:
     plugin: dump
     source: snap/local/
     organize:
-      launch: bin/poetit-launch
+      launch: bin/poet-it-launch
 
-  poetit:
+  poet-it:
     plugin: python
     source: .
     # The snap ships the optional "quality" extra (Stanza) so the dependency
     # diagram uses the more accurate biaffine parser; the bundled UDPipe model
     # remains the fallback. Pin torch to the CPU-only build: PyPI's torch is a
-    # CUDA build that adds ~4.5 GB poetit can never use. The pin only exists on
+    # CUDA build that adds ~4.5 GB poet-it can never use. The pin only exists on
     # the pytorch.org CPU index (PIP_EXTRA_INDEX_URL below). Keep the version in
     # sync with flatpak/python3-torch-cpu.json.
     python-packages:
@@ -50,7 +50,7 @@ parts:
       - PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
     override-build: |
       craftctl default
-      # Strip stanza/torch files poetit can never execute (headers, bundled
+      # Strip stanza/torch files poet-it can never execute (headers, bundled
       # binaries, test suites, type stubs) and verify the result still imports.
       SITE_PACKAGES=$(ls -d "$CRAFT_PART_INSTALL"/lib/python3.*/site-packages)
       python3 "$CRAFT_PART_BUILD"/scripts/trim_nlp_footprint.py \
@@ -68,13 +68,13 @@ parts:
       - espeak-ng-data
 
 apps:
-  poetit:
-    command: bin/poetit-launch
+  poet-it:
+    command: bin/poet-it-launch
     extensions: [gnome]
     plugs:
       # The app resolves every path through os.path.expanduser("~"), which under
       # strict confinement is the snap-private home ($SNAP_USER_DATA). So the
-      # repo (~/Documents/Poetit), state (~/.poetit) and model caches
+      # repo (~/Documents/Poet-it), state (~/.poet-it) and model caches
       # (~/stanza_resources, ~/nltk_data) all live inside the sandbox and need
       # no interface. `home` is here purely so the Import/Export/Open file
       # dialogs can reach the user's real, non-hidden home files.

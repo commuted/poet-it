@@ -1,9 +1,9 @@
-# PyInstaller spec for Poetit — Windows standalone build
+# PyInstaller spec for Poet-it — Windows standalone build
 # Run from the project root:
 #   pip install pyinstaller
-#   pyinstaller packaging/windows/poetit.spec
+#   pyinstaller packaging/windows/poet-it.spec
 #
-# Output: dist/Poetit/Poetit.exe  (folder distribution)
+# Output: dist/Poet-it/Poet-it.exe  (folder distribution)
 
 import sys
 from pathlib import Path
@@ -12,12 +12,12 @@ block_cipher = None
 ROOT = Path(SPECPATH).parent.parent   # project root
 
 a = Analysis(
-    [str(ROOT / 'poetit' / '__main__.py')],
+    [str(ROOT / 'poet_it' / '__main__.py')],
     pathex=[str(ROOT)],
     binaries=[],
     datas=[
-        # about.txt now lives in poetit/data and ships with the line below.
-        (str(ROOT / 'poetit' / 'data'),  'poetit/data'),
+        # about.txt now lives in poet_it/data and ships with the line below.
+        (str(ROOT / 'poet_it' / 'data'),  'poet_it/data'),
         (str(ROOT / 'qr-code.png'),       '.'),
         (str(ROOT / 'LICENSE'),           '.'),
         (str(ROOT / 'NOTICE'),            '.'),
@@ -68,7 +68,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='Poetit',
+    name='Poet-it',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -90,5 +90,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='Poetit',
+    name='Poet-it',
 )

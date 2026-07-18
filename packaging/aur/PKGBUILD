@@ -1,10 +1,10 @@
 # Maintainer: Ron Hinchley <commuted@gmail.com>
-pkgname=poetit
+pkgname=poet-it
 pkgver=0.1.0
 pkgrel=1
 pkgdesc="Desktop poetry editor with meter analysis, rhyme lookup, thesaurus, and version control"
 arch=('any')
-url="https://github.com/commuted/poetit"
+url="https://github.com/commuted/poet-it"
 license=('MIT')
 # Mirrors the required dependencies in pyproject.toml [project].dependencies.
 depends=(
@@ -43,10 +43,10 @@ package() {
     python -m installer --destdir="$pkgdir" dist/*.whl
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     install -Dm644 NOTICE  "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
-    install -Dm644 poetit/data/icon.png \
+    install -Dm644 poet_it/data/icon.png \
         "$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
-    install -Dm644 poetit/data/icon.png \
+    install -Dm644 poet_it/data/icon.png \
         "$pkgdir/usr/share/icons/hicolor/512x512/apps/$pkgname.png"
-    install -Dm644 poetit/data/poetit.desktop \
+    install -Dm644 poet_it/data/poet-it.desktop \
         "$pkgdir/usr/share/applications/$pkgname.desktop"
 }

@@ -1,11 +1,11 @@
 """Smoke tests for the UDPipe dependency-parse backend that feeds the diagram.
 
-The model (poetit/data/english-ewt.udpipe, CC BY-SA 4.0) is bundled, so these
+The model (poet_it/data/english-ewt.udpipe, CC BY-SA 4.0) is bundled, so these
 run wherever ufal.udpipe is installed.
 """
 import pytest
 
-from poetit.linguistics import Linguistics, UDPIPE_AVAILABLE
+from poet_it.linguistics import Linguistics, UDPIPE_AVAILABLE
 
 pytestmark = pytest.mark.skipif(not UDPIPE_AVAILABLE, reason="ufal.udpipe not installed")
 

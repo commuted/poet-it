@@ -1,8 +1,8 @@
-# Poetit
+# Poet-it
 
 A desktop poetry editor with built-in syllable counting, meter analysis, rhyme detection, thesaurus, dictionary, spell check, dependency diagrams, and git-based version control. Built with Python and tkinter — no Electron, no browser. 
 
-Python dependencies are ~1.7 GB installed (mostly PyTorch's CPU inference library, used by Stanza for parsing). Install torch from the CPU index as shown below — the default PyPI torch is a CUDA build that adds ~4.5 GB poetit can never use.
+Python dependencies are ~1.7 GB installed (mostly PyTorch's CPU inference library, used by Stanza for parsing). Install torch from the CPU index as shown below — the default PyPI torch is a CUDA build that adds ~4.5 GB poet-it can never use.
 
 ---
 
@@ -24,7 +24,7 @@ pip install -e ".[quality]"
 python -c "import stanza; stanza.download('en', package='ewt', processors='tokenize,mwt,pos,lemma,depparse')"
 ```
 
-Cost of quality mode: PyTorch adds ~1.7 GB installed, and Stanza's EWT model is a ~500 MB first-run download. When present, poetit uses Stanza automatically; otherwise it falls back to the bundled UDPipe model. To trim ~60 MB of stanza/torch files poetit never executes:
+Cost of quality mode: PyTorch adds ~1.7 GB installed, and Stanza's EWT model is a ~500 MB first-run download. When present, poet-it uses Stanza automatically; otherwise it falls back to the bundled UDPipe model. To trim ~60 MB of stanza/torch files poet-it never executes:
 
 ```bash
 python3 scripts/trim_nlp_footprint.py --keep-pyi \
@@ -48,13 +48,13 @@ NLTK data (punkt tokenizer, POS tagger) is downloaded automatically on first lau
 ## Run
 
 ```bash
-poetit
+poet-it
 ```
 
 or
 
 ```bash
-python -m poetit
+python -m poet_it
 ```
 
 ---
@@ -114,17 +114,17 @@ Click **Spell** to toggle inline spell-checking (powered by `pyspellchecker`). M
 
 Click in your poem then click **Diagram** to render a dependency parse of the sentence containing the cursor. Sentences are segmented with NLTK so a sentence (and its diagram) can span several lines — capitalised line starts don't break it. The diagram shows grammatical relationships between words, with POS tags and Universal Dependencies labels.
 
-Parsing uses the bundled **UDPipe** English model by default (no download). If the optional **quality mode** is installed (see Install), poetit uses Stanza's more accurate biaffine parser instead and falls back to UDPipe when it isn't available.
+Parsing uses the bundled **UDPipe** English model by default (no download). If the optional **quality mode** is installed (see Install), poet-it uses Stanza's more accurate biaffine parser instead and falls back to UDPipe when it isn't available.
 
 ---
 
 ## Version control
 
-Poetit uses git (via `dulwich`) to keep a history of every version of your poem. No git installation required — dulwich is a pure-Python git implementation, so version history works identically in the flatpak, snap, and on Windows.
+Poet-it uses git (via `dulwich`) to keep a history of every version of your poem. No git installation required — dulwich is a pure-Python git implementation, so version history works identically in the flatpak, snap, and on Windows.
 
 ### The repository folder
 
-Poems live in a single git repository at `~/Documents/Poetit`. The first time an operation needs it (for example **Import** or **Export**), Poetit offers to create the folder and seed it with a demo poem.
+Poems live in a single git repository at `~/Documents/Poet-it`. The first time an operation needs it (for example **Import** or **Export**), Poet-it offers to create the folder and seed it with a demo poem.
 
 ### Repository operations
 

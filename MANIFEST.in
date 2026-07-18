@@ -1,4 +1,4 @@
 include README.md
 include LICENSE
 include NOTICE
-recursive-include poetit/data *
+recursive-include poet_it/data *

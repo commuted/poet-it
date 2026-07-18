@@ -8,10 +8,10 @@ import tkinter.ttk as ttk
 from tkinter import filedialog, messagebox
 import tkinter.font as tkfont
 
-from poetit.linguistics import (Linguistics, word_at_cursor,
+from poet_it.linguistics import (Linguistics, word_at_cursor,
                                  UDPIPE_AVAILABLE as _UDPIPE_AVAILABLE)
-from poetit import file_io, popups
-from poetit.popups import DIAGRAM_AVAILABLE as _DIAGRAM_AVAILABLE
+from poet_it import file_io, popups
+from poet_it.popups import DIAGRAM_AVAILABLE as _DIAGRAM_AVAILABLE
 
 try:
     from dulwich.repo import Repo
@@ -22,7 +22,7 @@ except ImportError:
     _VCS_AVAILABLE = False
 
 # State file for persisting last-used repository
-_STATE_DIR = os.path.join(os.path.expanduser("~"), ".poetit")
+_STATE_DIR = os.path.join(os.path.expanduser("~"), ".poet-it")
 _STATE_FILE = os.path.join(_STATE_DIR, "state.json")
 
 MARGIN_CHARS = 2
@@ -45,8 +45,8 @@ _RECITE_DEFAULTS = {
 
 
 def _default_poems_dir() -> str:
-    """Return ~/Documents/Poetit, creating it if absent."""
-    d = os.path.join(os.path.expanduser("~"), "Documents", "Poetit")
+    """Return ~/Documents/Poet-it, creating it if absent."""
+    d = os.path.join(os.path.expanduser("~"), "Documents", "Poet-it")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -86,8 +86,8 @@ def _seed_demo_poem(repo_dir):
         _porcelain.commit(
             repo_dir,
             message=b"Add demo poem: Sonnet 43 by Elizabeth Barrett Browning",
-            author=b"Poetit <poetit@local>",
-            committer=b"Poetit <poetit@local>",
+            author=b"Poet-it <poet-it@local>",
+            committer=b"Poet-it <poet-it@local>",
         )
     except Exception:
         pass
@@ -120,18 +120,18 @@ _FONT_CANDIDATES = [
     "DejaVu Serif", "FreeSerif", "Liberation Serif", "Noto Serif", "Palatino",
 ]
 
-HOMEPAGE_URL = "https://github.com/commuted/poetit"
-ISSUES_URL   = "https://github.com/commuted/poetit/issues"
-README_URL   = "https://github.com/commuted/poetit#readme"
+HOMEPAGE_URL = "https://github.com/commuted/poet-it"
+ISSUES_URL   = "https://github.com/commuted/poet-it/issues"
+README_URL   = "https://github.com/commuted/poet-it#readme"
 
 _CONCISE_HELP = """\
-POETIT — HELP
+POET-IT — HELP
 
 Overview
 --------
-Poetit is a poetry editor with a live syllable count in the right margin and
+Poet-it is a poetry editor with a live syllable count in the right margin and
 a rhyme-scheme letter beside each line. Poems are kept in a Git repository at
-~/Documents/Poetit, so every saved version is recoverable.
+~/Documents/Poet-it, so every saved version is recoverable.
 
 The toolbar
 -----------
@@ -173,7 +173,7 @@ Version Tree  Shows every committed version of the current poem. Click one to
 Files
 -----
 New / Open / Save / Save As behave as usual. Browse Repository lists the poems
-already in ~/Documents/Poetit. Import copies an outside .txt file into the
+already in ~/Documents/Poet-it. Import copies an outside .txt file into the
 repository; Export writes the current poem back out to a chosen location.
 
 Appearance
@@ -186,10 +186,10 @@ Support
 Questions and bug reports: """ + ISSUES_URL + "\n"
 
 _LONG_HELP = """\
-POETIT — DETAILED GUIDE
+POET-IT — DETAILED GUIDE
 
-Poetit is a poetry editor that keeps every poem in a Git repository under
-~/Documents/Poetit, so each saved version stays recoverable. The right margin
+Poet-it is a poetry editor that keeps every poem in a Git repository under
+~/Documents/Poet-it, so each saved version stays recoverable. The right margin
 shows a live syllable count for every line, with a rhyme-scheme letter beside
 it.
 
@@ -256,7 +256,7 @@ Recite      A button at the right end of the menu line. Reads the whole poem
             accounts or cloud services. The button stays pressed while
             speaking; click it again to stop mid-poem.
 
-            The voice is configurable in ~/.poetit/state.json, under
+            The voice is configurable in ~/.poet-it/state.json, under
             "recite" (written with its defaults on first use):
               voice      espeak-ng voice id — `espeak-ng --voices=en`
               variant    timbre overlay from espeak-ng-data/voices/!v,
@@ -266,9 +266,9 @@ Recite      A button at the right end of the menu line. Reads the whole poem
               amplitude  0-200 (null = espeak's default, 100)
               word_gap   pause between words, in 10 ms units (espeak -g)
               capitals   pitch raise for capital letters, Hz (espeak -k)
-            The POETIT_VOICE environment variable, if set, overrides the
+            The POET_IT_VOICE environment variable, if set, overrides the
             configured voice+variant. Note the snap edition reads its own
-            copy: ~/snap/poetit/current/.poetit/state.json.
+            copy: ~/snap/poet-it/current/.poet-it/state.json.
 
 Diagram     Draws a dependency-parse diagram of the sentence at the cursor —
             see section 4. By default this uses a bundled UDPipe English model
@@ -277,10 +277,10 @@ Diagram     Draws a dependency-parse diagram of the sentence at the cursor —
             pulls in PyTorch (~1.7 GB) and downloads its own English model
             (~500 MB) on first use; install it with
 
-                pip install "poetit[quality]"
+                pip install "poet-it[quality]"
                 python -c "import stanza; stanza.download('en', package='ewt')"
 
-            When present, poetit uses Stanza automatically and falls back to the
+            When present, poet-it uses Stanza automatically and falls back to the
             bundled UDPipe model otherwise.
 
 4. THE DEPENDENCY DIAGRAM AND ITS TAG LEGENDS
@@ -341,7 +341,7 @@ Version Tree   Lists every committed version of the current poem; click one to
                load it. Unsaved edits prompt a Commit / Discard choice first.
 
 New / Open / Save / Save As behave as usual. Browse Repository lists the poems
-in ~/Documents/Poetit. Import copies an outside .txt file into the repository;
+in ~/Documents/Poet-it. Import copies an outside .txt file into the repository;
 Export writes the current poem out to a location you choose.
 
 6. APPEARANCE
@@ -879,12 +879,12 @@ class Editor:
     def _recite_command(self, exe):
         """Build the espeak-ng argv from settings.
 
-        POETIT_VOICE overrides the configured voice outright (including any
+        POET_IT_VOICE overrides the configured voice outright (including any
         "+variant" suffix the user puts in it); the state.json variant only
         layers onto the configured voice.
         """
         cfg = self._recite_settings()
-        voice = os.environ.get('POETIT_VOICE')
+        voice = os.environ.get('POET_IT_VOICE')
         if not voice:
             voice = cfg.get('voice') or _RECITE_DEFAULTS['voice']
             if cfg.get('variant'):
@@ -944,7 +944,7 @@ class Editor:
 
     def _about_click(self):
         popup = tk.Toplevel(self.root)
-        popup.title("About Poetit")
+        popup.title("About Poet-it")
         popup.transient(self.root)
         popup.resizable(False, False)
 
@@ -953,7 +953,7 @@ class Editor:
         from importlib.resources import files
         about_text = ""
         try:
-            about_text = files("poetit").joinpath("data", "about.txt").read_text(encoding="utf-8")
+            about_text = files("poet-it").joinpath("data", "about.txt").read_text(encoding="utf-8")
         except Exception:
             pass
 
@@ -1009,7 +1009,7 @@ class Editor:
 
         tk.Label(
             popup,
-            text="Poetit keeps your poems under version control.\n\n"
+            text="Poet-it keeps your poems under version control.\n\n"
                  f"Repository: {repo_dir}",
             justify="left", padx=12, pady=12,
         ).pack(anchor="w")
@@ -1268,7 +1268,7 @@ class Editor:
             _porcelain.commit(
                 self._repo_path,
                 message=message.encode("utf-8"),
-                author=b"Poetit User <poetit@local>",
+                author=b"Poet-it User <poet-it@local>",
             )
             return True
         except Exception as exc:
@@ -1280,7 +1280,7 @@ class Editor:
         repo = getattr(self, "_repo_path", None)
         if not repo:
             return None
-        recovery_dir = os.path.join(repo, ".poetit-recovery")
+        recovery_dir = os.path.join(repo, ".poet-it-recovery")
         os.makedirs(recovery_dir, exist_ok=True)
         from datetime import datetime
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -2056,7 +2056,7 @@ class Editor:
     def _repo_display_path(self):
         """Absolute path of the active repository, or the default location."""
         return self._repo_path or os.path.join(
-            os.path.expanduser("~"), "Documents", "Poetit")
+            os.path.expanduser("~"), "Documents", "Poet-it")
 
     def _refresh_repo_label(self):
         """Keep the menu-line repository indicator in sync with the active repo."""
@@ -2771,7 +2771,7 @@ class Editor:
     def _update_title(self):
         name  = os.path.basename(self._current_path) if self._current_path else "Untitled"
         dirty = " \u2022" if self._is_dirty else ""   # bullet = unsaved indicator
-        self.root.title(f"{name}{dirty} — Poetit")
+        self.root.title(f"{name}{dirty} — Poet-it")
 
     def _mark_dirty(self):
         if not self._is_dirty:
@@ -2894,11 +2894,11 @@ class Editor:
         tk.Button(popup, text="Close", command=popup.destroy).pack(pady=(0, 10))
 
     def _help_long(self):
-        body = _LONG_HELP.replace("~/Documents/Poetit", self._repo_display_path())
-        self._show_help_window("Poetit — Detailed Guide", body)
+        body = _LONG_HELP.replace("~/Documents/Poet-it", self._repo_display_path())
+        self._show_help_window("Poet-it — Detailed Guide", body)
 
     def _help_concise(self):
-        body = _CONCISE_HELP.replace("~/Documents/Poetit", self._repo_display_path())
+        body = _CONCISE_HELP.replace("~/Documents/Poet-it", self._repo_display_path())
         self._show_help_window("Concise Help", body)
 
     def _help_pdf(self):
@@ -3391,7 +3391,7 @@ def _load_icon(master=None):
     """Return a PhotoImage for the app icon, or None on failure."""
     try:
         from importlib.resources import files
-        icon_path = str(files('poetit').joinpath('data', 'icon.png'))
+        icon_path = str(files('poet-it').joinpath('data', 'icon.png'))
     except Exception:
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'icon.png')
     try:
@@ -3405,7 +3405,7 @@ def _load_icon(master=None):
 def setup_linux_desktop():
     """Install the .desktop file and icon for GNOME/Ubuntu launcher integration.
 
-    Run this once after pip install:  poetit-install-desktop
+    Run this once after pip install:  poet-it-install-desktop
     """
     import shutil
     import subprocess
@@ -3416,7 +3416,7 @@ def setup_linux_desktop():
 
     try:
         from importlib.resources import files as _res_files
-        data_dir = str(_res_files('poetit').joinpath('data'))
+        data_dir = str(_res_files('poet-it').joinpath('data'))
     except Exception:
         data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
@@ -3429,13 +3429,13 @@ def setup_linux_desktop():
     for size in ("16x16", "32x32", "48x48", "64x64", "128x128", "256x256", "512x512"):
         icon_dst_dir = os.path.join(xdg_data, "icons", "hicolor", size, "apps")
         os.makedirs(icon_dst_dir, exist_ok=True)
-        shutil.copy2(icon_src, os.path.join(icon_dst_dir, "poetit.png"))
+        shutil.copy2(icon_src, os.path.join(icon_dst_dir, "poet-it.png"))
 
     # Install the .desktop file.
     apps_dir = os.path.join(xdg_data, "applications")
     os.makedirs(apps_dir, exist_ok=True)
-    shutil.copy2(os.path.join(data_dir, "poetit.desktop"),
-                 os.path.join(apps_dir, "poetit.desktop"))
+    shutil.copy2(os.path.join(data_dir, "poet-it.desktop"),
+                 os.path.join(apps_dir, "poet-it.desktop"))
 
     # Refresh caches so the DE picks up the changes immediately.
     for cmd in (
@@ -3491,7 +3491,7 @@ def _shield_x_connection():
 
 
 def main():
-    root = tk.Tk(className="Poetit")
+    root = tk.Tk(className="Poet-it")
     root.withdraw()
     _shield_x_connection()
 
@@ -3509,7 +3509,7 @@ def main():
         import io as _io
         from importlib.resources import files as _files
         from PIL import Image as _PILImage, ImageTk as _PILImageTk
-        _raw = _files('poetit').joinpath('data', 'ICD9N.jpg').read_bytes()
+        _raw = _files('poet-it').joinpath('data', 'ICD9N.jpg').read_bytes()
         _splash_img = _PILImageTk.PhotoImage(
             _PILImage.open(_io.BytesIO(_raw)).resize((480, 320), _PILImage.LANCZOS),
             master=splash)
@@ -3520,7 +3520,7 @@ def main():
     if _splash_img:
         tk.Label(splash, image=_splash_img, bg="black").pack()
     else:
-        tk.Label(splash, text="Poetit", font=("Courier", 28, "bold"),
+        tk.Label(splash, text="Poet-it", font=("Courier", 28, "bold"),
                  fg="#c9a84c", bg="#1a1a1a", width=40, height=10).pack()
 
     status_var = tk.StringVar(value="Initializing…")

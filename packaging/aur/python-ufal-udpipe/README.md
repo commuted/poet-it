@@ -2,7 +2,7 @@
 
 A ready-to-submit AUR package for [`ufal.udpipe`](https://pypi.org/project/ufal.udpipe/),
 the Python bindings for [UDPipe](https://ufal.mff.cuni.cz/udpipe) (tokenization,
-tagging, lemmatization, and dependency parsing). poetit uses it as the default,
+tagging, lemmatization, and dependency parsing). poet-it uses it as the default,
 bundled-model dependency-diagram backend, but it is a generic, standalone binding
 useful to any package — hence offered here as its own AUR package rather than
 vendored.

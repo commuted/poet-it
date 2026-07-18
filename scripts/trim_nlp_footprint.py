@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Trim unused Stanza and PyTorch files from an installed site-packages.
 
-poetit uses exactly one Stanza pipeline — Pipeline('en',
+poet-it uses exactly one Stanza pipeline — Pipeline('en',
 processors='tokenize,mwt,pos,lemma,depparse') — running CPU-only torch
-inference (see Linguistics._STANZA_PROCESSORS in poetit/linguistics.py).
+inference (see Linguistics._STANZA_PROCESSORS in poet_it/linguistics.py).
 The deny-list below was derived by tracing every module that pipeline
 loads (including the stanza.download() code path) and deleting only
 subtrees containing none of them.
@@ -11,7 +11,7 @@ subtrees containing none of them.
 Two hard constraints shape the list:
   * stanza/pipeline/core.py eagerly imports EVERY processor family (ner,
     constituency, coref, sentiment, langid) plus stanza.server.* — so
-    stanza model packages must stay even though poetit never runs them.
+    stanza model packages must stay even though poet-it never runs them.
   * importing torch touches ~1000 python modules across nearly all of its
     subpackages — so only non-code assets (C++ headers, bundled binaries,
     type stubs, cmake files) are removed from torch. Never delete torch
