@@ -144,3 +144,15 @@ modules:
       #   commit: <full sha>
       - type: dir
         path: ..
+        # Keep build artifacts and VCS state out of the source copy: smaller,
+        # deterministic builds, and no chance of a stale build/ or egg-info
+        # poisoning pip, or a cached copy masking new files.
+        skip:
+          - .git
+          - build
+          - poet_it.egg-info
+          - poet-it_0.1.0_amd64.snap
+          - flatpak/.flatpak-builder
+          - flatpak/builddir
+          - .pytest_cache
+          - .ruff_cache
