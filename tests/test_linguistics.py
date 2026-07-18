@@ -198,8 +198,12 @@ class TestGetRhymes:
         rhymes = nlp.get_rhymes("cat")
         assert any(r.lower() in ("copycat", "pussycat", "tomcat") for r in rhymes)
 
-    def test_unknown_word_returns_empty(self, nlp):
-        assert nlp.get_rhymes("xyzzy") == []
+    def test_unknown_word_falls_back_to_spelling_proxy(self, nlp):
+        # Absent from cmudict, but the -zzy spelling suffix yields a proxy.
+        assert nlp.get_rhymes("xyzzy")
+
+    def test_unmatchable_word_returns_empty(self, nlp):
+        assert nlp.get_rhymes("zzzqx") == []
 
 
 # ── _is_function ──────────────────────────────────────────────────────────────

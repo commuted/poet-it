@@ -953,7 +953,7 @@ class Editor:
         from importlib.resources import files
         about_text = ""
         try:
-            about_text = files("poet-it").joinpath("data", "about.txt").read_text(encoding="utf-8")
+            about_text = files("poet_it").joinpath("data", "about.txt").read_text(encoding="utf-8")
         except Exception:
             pass
 
@@ -1660,6 +1660,7 @@ class Editor:
                     f'Click to insert into line {row + 1}:',
                     self._nlp.get_rhymes(word),
                     lambda r: self._insert_word(r, row, ws, we),
+                    note=self._rhyme_proxy_note(word),
                 )
             else:
                 messagebox.showinfo("Rhyme", "Place the cursor on or after a word.")
@@ -1672,6 +1673,17 @@ class Editor:
             "Or type a word in the field next to Rhyme and press Enter."
         )
 
+    def _rhyme_proxy_note(self, word):
+        """Popup note when rhymes come from a spelling stand-in because the
+        word itself is not in the pronunciation dictionary."""
+        if self._nlp.knows_pronunciation(word):
+            return None
+        proxy = self._nlp.rhyme_proxy(word)
+        if proxy:
+            return (f'"{word}" is not in the pronunciation dictionary — '
+                    f'showing rhymes for the similarly spelled "{proxy}".')
+        return None
+
     def _rhyme_lookup_from_field(self, _event=None):
         word = self._rhyme_input_var.get().strip()
         if word:
@@ -1680,6 +1692,7 @@ class Editor:
                 'Rhymes (display only — click in poem to insert):',
                 self._nlp.get_rhymes(word),
                 lambda _: None,
+                note=self._rhyme_proxy_note(word),
             )
 
     # ------------------------------------------------------------------ #
@@ -3391,7 +3404,7 @@ def _load_icon(master=None):
     """Return a PhotoImage for the app icon, or None on failure."""
     try:
         from importlib.resources import files
-        icon_path = str(files('poet-it').joinpath('data', 'icon.png'))
+        icon_path = str(files('poet_it').joinpath('data', 'icon.png'))
     except Exception:
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'icon.png')
     try:
@@ -3416,7 +3429,7 @@ def setup_linux_desktop():
 
     try:
         from importlib.resources import files as _res_files
-        data_dir = str(_res_files('poet-it').joinpath('data'))
+        data_dir = str(_res_files('poet_it').joinpath('data'))
     except Exception:
         data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
@@ -3509,7 +3522,7 @@ def main():
         import io as _io
         from importlib.resources import files as _files
         from PIL import Image as _PILImage, ImageTk as _PILImageTk
-        _raw = _files('poet-it').joinpath('data', 'ICD9N.jpg').read_bytes()
+        _raw = _files('poet_it').joinpath('data', 'ICD9N.jpg').read_bytes()
         _splash_img = _PILImageTk.PhotoImage(
             _PILImage.open(_io.BytesIO(_raw)).resize((480, 320), _PILImage.LANCZOS),
             master=splash)

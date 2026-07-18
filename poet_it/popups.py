@@ -29,7 +29,7 @@ def show_word_list_popup(root, title, header, words, on_select, width=220, heigh
         tk.Button(popup, text='Close', command=popup.destroy).pack(pady=6)
         return
 
-    tk.Label(popup, text=f'{len(words)} found — double-click or press Enter to insert.',
+    tk.Label(popup, text=f'{len(words)} found — click a word (or press Enter) to insert.',
              anchor='w', fg='gray').pack(fill=tk.X, padx=6)
 
     outer = tk.Frame(popup)
@@ -64,7 +64,9 @@ def show_word_list_popup(root, title, header, words, on_select, width=220, heigh
         elif event.num == 5: lb.yview_scroll(1, 'units')
         else:                lb.yview_scroll(int(-1 * (event.delta / 120)), 'units')
 
-    lb.bind('<Double-Button-1>', _choose)
+    # Single click inserts, matching the old one-Button-per-word behaviour.
+    # ButtonRelease fires after the press has updated the selection.
+    lb.bind('<ButtonRelease-1>', _choose)
     lb.bind('<Return>', _choose)
     popup.bind('<Escape>', lambda e: popup.destroy())
     for seq in ('<MouseWheel>', '<Button-4>', '<Button-5>'):

@@ -291,12 +291,33 @@ class Linguistics:
                 return tuple(re.sub(r'\d', '', ph) for ph in entry[i:])
         return None
 
+    def knows_pronunciation(self, word):
+        return word.lower() in self._cmu
+
+    def rhyme_proxy(self, word):
+        """Stand-in for a word cmudict lacks: the shortest known word sharing
+        the longest spelling suffix (>= 3 letters), or None. English spelling
+        tails track pronunciation tails well enough for rhyme lookup."""
+        w = word.lower()
+        if w in self._cmu:
+            return None
+        for n in range(min(len(w), 8), 2, -1):
+            suffix = w[-n:]
+            candidates = [k for k in self._cmu if k.endswith(suffix)]
+            if candidates:
+                return min(candidates, key=len)
+        return None
+
     def get_rhymes(self, word):
         if not self._rhyme_dict:
             return []
         entries = self._cmu.get(word.lower())
         if not entries:
-            return []
+            proxy = self.rhyme_proxy(word)
+            if proxy is None:
+                return []
+            word = proxy
+            entries = self._cmu.get(proxy)
         phonemes = [re.sub(r'\d', '', ph) for ph in entries[0]]
         rev = list(reversed(phonemes))
         key = rev[0]
