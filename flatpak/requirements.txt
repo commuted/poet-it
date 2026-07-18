@@ -1,7 +1,11 @@
 # After editing this file, regenerate python3-requirements.json:
 #   ./flatpak/generate-pip-sources.sh
 nltk>=3.8
-prosodic>=3.0
+# Pinned: 3.10 renamed the parse-slot API and broke meter rendering; 3.8.0 is
+# the last version our scansion renderer targets. Keep in sync with pyproject.
+# The generated python3-requirements.json currently pins 3.4.0 (compatible API);
+# rerun generate-pip-sources.sh to move it to 3.8.0.
+prosodic==3.8.0
 ufal.udpipe>=1.3
 stanza>=1.7
 dulwich>=0.22

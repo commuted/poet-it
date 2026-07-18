@@ -34,7 +34,11 @@ classifiers = [
 # Stanza downloads its English model automatically on first use.
 dependencies = [
     "nltk>=3.8",
-    "prosodic>=3.0",
+    # Pinned: prosodic 3.10 renamed the parse-slot API (slot.syll -> slot.unit)
+    # and changed WordToken whitespace, which breaks meter rendering (blank
+    # output). 3.8.0 is the last version whose slot/wordtoken API our
+    # scansion renderer (linguistics._compose_meter_line_prosodic) targets.
+    "prosodic==3.8.0",
     "ufal.udpipe>=1.3",
     "dulwich>=0.22",
     "resvg_py>=0.3",

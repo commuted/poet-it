@@ -789,11 +789,27 @@ class Linguistics:
         try:
             import prosodic as _prosodic
             t = _prosodic.Text(text)
-            t.parse()
             if not t.lines:
                 return None
             line = t.lines[0]
-            bp   = line.best_parse
+            # Two inputs make prosodic's parser log a loud MAX_SYLL warning to
+            # stderr (and, for long lines, burn ~2s before giving up), leaving
+            # best_parse None either way:
+            #   • a line with no parseable words — e.g. punctuation only — has
+            #     wordforms=None, yet prosodic vocalizes it at parse time (a row
+            #     of ~25 periods scans as ~27 "syllables") and trips the cap;
+            #   • any line longer than MAX_SYLL_IN_PARSE_UNIT syllables.
+            # Detect both up front from the cheap syllabification Text() already
+            # did and skip straight to the NLTK fallback — no warning, no wasted
+            # parse, and the same meter output the fallback already produced.
+            if not line.wordforms:
+                return None
+            max_syll = getattr(_prosodic, "MAX_SYLL_IN_PARSE_UNIT", 18)
+            nsyll = sum(len(getattr(wf, "syllables", ())) for wf in line.wordforms)
+            if nsyll > max_syll:
+                return None
+            t.parse()
+            bp = line.best_parse
             if bp is None:
                 return None
             slots    = [s for s in bp.slots if s.syll is not None]
