@@ -206,6 +206,34 @@ class TestGetRhymes:
         assert nlp.get_rhymes("zzzqx") == []
 
 
+# ── get_thesaurus ──────────────────────────────────────────────────────────────
+
+class TestGetThesaurus:
+    def test_direct_entry_has_no_stem(self, nlp):
+        synonyms, stem = nlp.get_thesaurus("grief")
+        assert synonyms
+        assert stem is None
+
+    def test_plural_falls_back_to_singular_stem(self, nlp):
+        # "griefs" has no entry of its own; morphy reduces it to "grief".
+        synonyms, stem = nlp.get_thesaurus("griefs")
+        assert stem == "grief"
+        assert synonyms == nlp.get_thesaurus("grief")[0]
+
+    def test_ly_adverb_falls_back_to_adjective_stem(self, nlp):
+        # "freely" has no entry; morphy leaves it alone (it's WordNet's own
+        # lemma), so the hand-rolled "-ly" strip should find "free".
+        synonyms, stem = nlp.get_thesaurus("freely")
+        assert stem == "free"
+        assert "at large" in synonyms
+        assert "freely" not in [s.lower() for s in synonyms]
+
+    def test_unmatchable_word_returns_empty_with_no_stem(self, nlp):
+        synonyms, stem = nlp.get_thesaurus("zzzqx")
+        assert synonyms == []
+        assert stem is None
+
+
 # ── _is_function ──────────────────────────────────────────────────────────────
 
 class TestIsFunction:

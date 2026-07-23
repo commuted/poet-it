@@ -375,12 +375,15 @@ class Editor:
                 cursor = self._last_focus_cursor
             word, ws, we = word_at_cursor(text, cursor)
             if word:
+                synonyms, stem = self._nlp.get_thesaurus(word)
+                note = f'No entry for "{word}" — showing "{stem}" instead.' if stem else None
                 popups.show_word_list_popup(
                     self.root, f'Thesaurus: "{word}"',
                     f'Click to replace in line {row + 1}:',
-                    self._nlp.get_thesaurus(word),
+                    synonyms,
                     lambda s: self._insert_word(s, row, ws, we),
                     width=240, height=380,
+                    note=note,
                 )
                 return
             messagebox.showinfo("Thesaurus", "Place the cursor on or after a word.")

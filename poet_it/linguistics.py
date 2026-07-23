@@ -410,16 +410,53 @@ class Linguistics:
                 self._thesaurus_loading = False
             thesaurus = result
         if not thesaurus:
-            return []
+            return [], None
         key  = word.lower()
         syns = thesaurus.get(key, [])
+        stem = None
+        if not syns:
+            for candidate in self._stem_candidates(key):
+                syns = thesaurus.get(candidate, [])
+                if syns:
+                    stem = candidate
+                    break
         seen, result = {key}, []
         for s in syns:
             sl = s.lower()
             if sl not in seen:
                 seen.add(sl)
                 result.append(s)
-        return result
+        return result, stem
+
+    @staticmethod
+    def _stem_candidates(word):
+        """Plausible base forms of `word`, most likely first, tried when a
+        direct thesaurus lookup comes back empty — e.g. "griefs" -> "grief"
+        or "freely" -> "free". Best-effort: a wrong guess simply finds no
+        thesaurus entry and is skipped by the caller, so nothing here needs
+        to be exhaustive or exact.
+        """
+        tried = {word}
+        try:
+            from nltk.corpus import wordnet as _wn
+            morphed = _wn.morphy(word)
+        except Exception:
+            morphed = None
+        if morphed and morphed not in tried:
+            tried.add(morphed)
+            yield morphed
+        # Regular "-ly" adverbs aren't inflections in WordNet's eyes, so
+        # morphy leaves them alone. Strip the suffix by hand instead:
+        # "freely" -> "free", "truly" -> "tru" -> "true".
+        if word.endswith("ly") and len(word) > 4:
+            stripped = word[:-2]
+            if stripped not in tried:
+                tried.add(stripped)
+                yield stripped
+            with_e = stripped + "e"
+            if with_e not in tried:
+                tried.add(with_e)
+                yield with_e
 
     # ------------------------------------------------------------------ #
     # Spell checking
